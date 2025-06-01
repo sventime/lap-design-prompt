@@ -188,10 +188,12 @@ export async function sendPromptToMidjourney(
 export async function sendMultiplePromptsToMidjourney(
   prompts: string[], 
   imageBase64?: string, 
-  onProgress?: (promptIndex: number, total: number, status: string) => void
+  onProgress?: (promptIndex: number, total: number, status: string) => void,
+  sessionId?: string
 ): Promise<{
   success: boolean;
   results: Array<{ prompt: string; messageId?: string; error?: string }>;
+  aborted?: boolean;
 }> {
   try {
     await midjourneyClient.Connect();
@@ -213,6 +215,25 @@ export async function sendMultiplePromptsToMidjourney(
     
     for (let i = 0; i < prompts.length; i++) {
       const prompt = prompts[i];
+      
+      // Check for abort signal if sessionId is provided
+      if (sessionId) {
+        try {
+          const { shouldAbortProcessing } = await import('../app/api/abort-processing/route');
+          if (shouldAbortProcessing(sessionId)) {
+            console.log(`[Midjourney] Processing aborted for session: ${sessionId}`);
+            onProgress?.(i + 1, prompts.length, `Processing aborted by user at prompt ${i + 1}/${prompts.length}`);
+            return {
+              success: false,
+              aborted: true,
+              results
+            };
+          }
+        } catch (importError) {
+          console.warn('[Midjourney] Could not check abort signal:', importError);
+        }
+      }
+      
       try {
         onProgress?.(i + 1, prompts.length, `Processing prompt ${i + 1}/${prompts.length}...`);
         console.log(`[Midjourney] Sending prompt ${i + 1}/${prompts.length}: ${prompt}`);

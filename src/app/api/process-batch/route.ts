@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateMidjourneyPrompt } from '@/lib/openai';
 import { sendProgressUpdate } from '../progress/route';
+import { shouldAbortProcessing, clearAbortSignal } from '../abort-processing/route';
 
 interface BatchItem {
   id: string;
@@ -42,6 +43,38 @@ export async function POST(request: NextRequest) {
     
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+      
+      // Check if processing should be aborted
+      if (shouldAbortProcessing(sessionId || '')) {
+        console.log(`[BATCH] Processing aborted by user for session: ${sessionId}`);
+        
+        // Send abort notification
+        if (sessionId) {
+          sendProgressUpdate(sessionId, {
+            type: 'batch_aborted',
+            total: items.length,
+            completed: i,
+            processing: 0,
+            status: `Processing stopped by user after ${i} items`,
+            abortedAt: i
+          });
+        }
+        
+        // Clear the abort signal
+        clearAbortSignal(sessionId || '');
+        
+        // Return partial results
+        return NextResponse.json({
+          success: false,
+          aborted: true,
+          message: 'Processing stopped by user',
+          results,
+          totalProcessed: results.length,
+          successCount: results.filter(r => r.success).length,
+          errorCount: results.filter(r => !r.success).length,
+          abortedAt: i
+        });
+      }
       
       // Update progress - mark current item as processing
       if (sessionId) {
@@ -100,7 +133,8 @@ export async function POST(request: NextRequest) {
                 status: `Processing image ${i + 1}/${items.length}: ${status}`
               });
             }
-          }
+          },
+          sessionId // Pass sessionId for abort checking
         );
 
         const itemResult = {

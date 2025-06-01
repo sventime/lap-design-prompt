@@ -16,7 +16,8 @@ export async function generateMidjourneyPrompt(
   genderType: "male" | "female" = "female",
   guidance?: string,
   autoSendToMidjourney: boolean = true,
-  onMidjourneyProgress?: (promptIndex: number, total: number, status: string) => void
+  onMidjourneyProgress?: (promptIndex: number, total: number, status: string) => void,
+  sessionId?: string
 ): Promise<{
   prompt: string;
   midjourneyPrompts: string[];
@@ -52,10 +53,11 @@ Requirements:
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
 - DO NOT use markdown formatting (no **, -, or other markdown)
-- Format: "PROMPT1: [full prompt description] --ar 2:3 --q 2 --s 250"
-- Format: "PROMPT2: [full prompt description] --ar 2:3 --q 2 --s 250"
-- Format: "PROMPT3: [full prompt description] --ar 2:3 --q 2 --s 250"
-- Use plain text only, no bold or bullet points
+- DO NOT wrap prompts in quotation marks
+- Format: PROMPT1: [full prompt description] --ar 2:3 --q 2 --s 250
+- Format: PROMPT2: [full prompt description] --ar 2:3 --q 2 --s 250
+- Format: PROMPT3: [full prompt description] --ar 2:3 --q 2 --s 250
+- Use plain text only, no bold or bullet points, no quotation marks
 
 Also create 10 product names:
 Format: "NAME1: English Name | Russian Translation"
@@ -75,15 +77,16 @@ Requirements:
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
 - DO NOT use markdown formatting (no **, -, or other markdown)
-- Format: "PROMPT1: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2"
-- Format: "PROMPT2: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2"
-- Format: "PROMPT3: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2"
-- Use plain text only, no bold or bullet points
+- DO NOT wrap prompts in quotation marks
+- Format: PROMPT1: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2
+- Format: PROMPT2: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2
+- Format: PROMPT3: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2
+- Use plain text only, no bold or bullet points, no quotation marks
 
 Examples of good fabric texture prompts:
-- "Cotton denim fabric texture, diagonal twill weave, indigo blue threads, raw selvedge edge, macro photography --ar 1:1 --q 2"
-- "Wool herringbone fabric texture, chevron weave pattern, charcoal gray fibers, soft hand feel, macro photography --ar 1:1 --q 2"
-- "Silk charmeuse fabric texture, satin weave, lustrous surface, fluid drape, ivory color, macro photography --ar 1:1 --q 2"
+- Cotton denim fabric texture, diagonal twill weave, indigo blue threads, raw selvedge edge, macro photography --ar 1:1 --q 2
+- Wool herringbone fabric texture, chevron weave pattern, charcoal gray fibers, soft hand feel, macro photography --ar 1:1 --q 2
+- Silk charmeuse fabric texture, satin weave, lustrous surface, fluid drape, ivory color, macro photography --ar 1:1 --q 2
 `
 }
 
@@ -132,6 +135,8 @@ Do not include /imagine command.`,
         line = line.replace(/^\*\*|\*\*$/g, ""); // Remove ** at start/end
         line = line.replace(/^-\s*/, ""); // Remove bullet points
         line = line.replace(/^\*\s*/, ""); // Remove asterisk bullets
+        // Remove quotation marks that might wrap the entire prompt
+        line = line.replace(/^["']|["']$/g, ""); // Remove quotes at start/end
         return line.trim();
       })
       .filter((line) => line.match(/^PROMPT\s*\d+\s*:/i))
@@ -150,6 +155,8 @@ Do not include /imagine command.`,
           line = line.replace(/^\*\*|\*\*$/g, ""); // Remove ** at start/end
           line = line.replace(/^-\s*/, ""); // Remove bullet points
           line = line.replace(/^\*\s*/, ""); // Remove asterisk bullets
+          // Remove quotation marks that might wrap the content
+          line = line.replace(/^["']|["']$/g, ""); // Remove quotes at start/end
           return line.trim();
         })
         .filter((line) => line.match(/^NAME\s*\d+\s*:/i))
@@ -178,7 +185,8 @@ Do not include /imagine command.`,
         const midjourneyResult = await sendMultiplePromptsToMidjourney(
           result.midjourneyPrompts,
           imageBase64,
-          onMidjourneyProgress
+          onMidjourneyProgress,
+          sessionId
         );
 
         console.log("[OpenAI] Midjourney results:", midjourneyResult);

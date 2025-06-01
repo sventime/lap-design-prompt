@@ -193,11 +193,11 @@ export default function FileUpload({ onFilesUpload, disabled = false }: FileUplo
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {files.map((file) => (
               <div key={file.id} className="group card-hover glass rounded-2xl border border-gray-700/50 overflow-hidden">
-                <div className="relative">
+                <div className="relative aspect-square">
                   <img
                     src={file.preview}
                     alt={file.file.name}
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
                   />
                   
                   <button

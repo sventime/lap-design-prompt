@@ -15,6 +15,7 @@ export default function Home() {
   const { version, buildTime } = getVersionDisplay();
   const [completedIdCounter, setCompletedIdCounter] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingAborted, setProcessingAborted] = useState(false);
   const [selectedImage, setSelectedImage] = useState<UploadedImage | null>(
     null
   );
@@ -193,7 +194,8 @@ export default function Home() {
             break;
 
           case "batch_completed":
-            console.log("[SSE] Batch completed - cleaning up");
+          case "batch_aborted":
+            console.log(`[SSE] Batch ${data.type === 'batch_aborted' ? 'aborted' : 'completed'} - cleaning up`);
             setProgressData({
               total: data.total,
               completed: data.completed,
@@ -205,6 +207,9 @@ export default function Home() {
 
             // Mark processing as complete
             setIsProcessing(false);
+            
+            // Reset abort flag
+            setProcessingAborted(false);
 
             // Clean up SSE connection after a brief delay
             setTimeout(() => {
@@ -254,11 +259,51 @@ export default function Home() {
     }
   };
 
+  // Stop processing function
+  const handleStopProcessing = () => {
+    console.log("[STOP] User requested to stop processing");
+    setProcessingAborted(true);
+    setIsProcessing(false);
+    
+    // Send abort signal to server
+    if (sessionId) {
+      fetch('/api/abort-processing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId })
+      }).catch(err => console.warn('[STOP] Failed to notify server:', err));
+    }
+    
+    // Cleanup SSE connection
+    cleanupSSEConnection();
+    
+    // Reset progress
+    setProgressData({
+      total: 0,
+      completed: 0,
+      processing: 0,
+      status: "Processing stopped by user",
+      currentItem: null,
+      midjourneyProgress: undefined,
+    });
+    
+    // Add stop message to server updates
+    setServerUpdates(prev => [...prev, {
+      timestamp: Date.now(),
+      type: 'processing_stopped',
+      message: 'Processing stopped by user request',
+      details: { sessionId }
+    }]);
+  };
+
   const handleProcessAll = async () => {
     if (images.length === 0) {
       alert("Please upload some images first");
       return;
     }
+
+    // Reset abort flag
+    setProcessingAborted(false);
 
     // Generate unique session ID for this batch
     const newSessionId = `batch_${Date.now()}_${Math.random()
@@ -641,7 +686,7 @@ export default function Home() {
 
           {/* Action Buttons */}
           {images.length > 0 && (
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center space-x-4">
               <button
                 onClick={handleProcessAll}
                 disabled={isProcessing || images.length === 0}
@@ -658,6 +703,19 @@ export default function Home() {
                     : `Generate Prompts for ${images.length} Images`}
                 </span>
               </button>
+              
+              {/* Stop Processing Button */}
+              {isProcessing && (
+                <button
+                  onClick={handleStopProcessing}
+                  className="group flex items-center space-x-3 px-6 py-4 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 rounded-xl font-semibold text-white shadow-2xl transition-all hover:scale-105 cursor-pointer"
+                >
+                  <div className="h-6 w-6 flex items-center justify-center">
+                    <div className="h-3 w-3 bg-white rounded-sm"></div>
+                  </div>
+                  <span className="text-lg">Stop Processing</span>
+                </button>
+              )}
             </div>
           )}
 
