@@ -55,25 +55,35 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
         </div>
         
         {/* Current Item Being Processed */}
-        {progressData?.currentItem && (
-          <div className="mb-4 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-            <div className="flex items-center space-x-3">
-              <Loader2 className="h-5 w-5 text-indigo-400 animate-spin" />
-              <div className="text-indigo-300">
-                <span className="font-medium">Currently processing:</span>{' '}
-                <span className="text-white font-semibold">{progressData.currentItem.fileName}</span>{' '}
-                <span className="text-indigo-200">{progressData.currentItem.clothingPart}</span>
-                <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium border ${
-                  progressData.currentItem.promptType === 'outfit' 
-                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' 
-                    : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                }`}>
-                  {progressData.currentItem.promptType === 'outfit' ? 'Outfit' : 'Texture'}
-                </span>
-              </div>
-            </div>
+        <div className="mb-4 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+          <div className="flex items-center space-x-3">
+            {progressData?.currentItem ? (
+              <>
+                <Loader2 className="h-5 w-5 text-indigo-400 animate-spin" />
+                <div className="text-indigo-300">
+                  <span className="font-medium">Currently processing:</span>{' '}
+                  <span className="text-white font-semibold">{progressData.currentItem.fileName}</span>{' '}
+                  <span className="text-indigo-200">{progressData.currentItem.clothingPart}</span>
+                  <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium border ${
+                    progressData.currentItem.promptType === 'outfit' 
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' 
+                      : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                  }`}>
+                    {progressData.currentItem.promptType === 'outfit' ? 'Outfit' : 'Texture'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="h-5 w-5 rounded-full bg-indigo-400/20 border border-indigo-400/30"></div>
+                <div className="text-indigo-300">
+                  <span className="font-medium">Preparing batch processing...</span>
+                  <span className="text-indigo-200 ml-2">Please wait while we initialize</span>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Progress Bar */}
         <div className="relative w-full bg-gray-700/50 rounded-full h-4 mb-8 overflow-hidden">

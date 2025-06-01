@@ -6,8 +6,8 @@ export interface UploadedImage {
   customClothingPart?: string;
   promptType: PromptType;
   status: 'pending' | 'processing' | 'completed' | 'error';
-  prompt?: string;
-  midjourneyPrompts?: string[];
+  prompt?: string; // Original ChatGPT response
+  midjourneyPrompts?: string[]; // Parsed Midjourney prompts
   error?: string;
   completedId?: number;
   generatedAt?: Date;

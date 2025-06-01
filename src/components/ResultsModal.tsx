@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Download, Zap } from 'lucide-react';
+import { X, Download, MessageSquare, Copy, Check } from 'lucide-react';
 import { UploadedImage, formatFileSize } from '@/types';
 import PromptCard from './PromptCard';
 
@@ -13,6 +13,8 @@ interface ResultsModalProps {
 
 export default function ResultsModal({ image, isOpen, onClose }: ResultsModalProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'prompts' | 'chatgpt'>('prompts');
+  const [chatGPTResponseCopied, setChatGPTResponseCopied] = useState(false);
 
   if (!isOpen || !image) return null;
 
@@ -26,19 +28,15 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
     }
   };
 
-  const copyAllPrompts = async () => {
-    if (!image.midjourneyPrompts) return;
-    
-    const allPrompts = image.midjourneyPrompts
-      .map((prompt, index) => `${index + 1}. ${prompt}`)
-      .join('\n\n');
+  const copyChatGPTResponse = async () => {
+    if (!image.prompt) return;
     
     try {
-      await navigator.clipboard.writeText(allPrompts);
-      setCopiedIndex(-1); // Special index for "all copied"
-      setTimeout(() => setCopiedIndex(null), 2000);
+      await navigator.clipboard.writeText(image.prompt);
+      setChatGPTResponseCopied(true);
+      setTimeout(() => setChatGPTResponseCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy all prompts: ', err);
+      console.error('Failed to copy ChatGPT response: ', err);
     }
   };
 
@@ -70,7 +68,7 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-60">
       <div className="glass border border-gray-700/50 rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-8 border-b border-gray-700/50">
@@ -83,13 +81,6 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
             </p>
           </div>
           <div className="flex items-center space-x-4">
-            <button
-              onClick={copyAllPrompts}
-              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-500 hover:to-pink-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
-            >
-              <Zap className="h-5 w-5" />
-              <span>{copiedIndex === -1 ? 'Copied!' : 'Copy All'}</span>
-            </button>
             <button
               onClick={downloadPrompts}
               className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-500 hover:to-blue-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
@@ -133,37 +124,112 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
             </div>
           </div>
 
-          {/* Prompts List */}
+          {/* Tabs and Content */}
           <div className="flex-1 p-8 overflow-y-auto">
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-bold text-white">
-                  Generated Prompts ({image.midjourneyPrompts?.length || 0})
-                </h3>
-                <span className="text-sm text-indigo-300 font-medium px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30">
-                  Ready for Midjourney v6
-                </span>
+              {/* Tab Navigation */}
+              <div className="flex items-center space-x-1 bg-gray-800/50 border border-gray-700/50 rounded-xl p-1">
+                <button
+                  onClick={() => setActiveTab('prompts')}
+                  className={`flex-1 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-300 cursor-pointer ${
+                    activeTab === 'prompts'
+                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                      : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+                  }`}
+                >
+                  Prompts ({image.midjourneyPrompts?.length || 0})
+                </button>
+                <button
+                  onClick={() => setActiveTab('chatgpt')}
+                  className={`flex-1 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-300 cursor-pointer ${
+                    activeTab === 'chatgpt'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                      : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+                  }`}
+                >
+                  ChatGPT Response
+                </button>
               </div>
 
-              {image.midjourneyPrompts?.map((prompt, index) => (
-                <PromptCard
-                  key={index}
-                  prompt={prompt}
-                  index={index}
-                  onCopy={copyToClipboard}
-                  copied={copiedIndex === index}
-                />
-              ))}
-
-              {(!image.midjourneyPrompts || image.midjourneyPrompts.length === 0) && (
-                <div className="text-center py-8 text-gray-500">
-                  No prompts generated yet.
+              {/* Tab Content */}
+              <div className="relative overflow-hidden">
+                {/* Prompts Tab */}
+                <div className={`transition-all duration-300 ease-in-out ${
+                  activeTab === 'prompts' 
+                    ? 'opacity-100 translate-x-0' 
+                    : 'opacity-0 translate-x-4 absolute inset-0 pointer-events-none'
+                }`}>
+                  {image.midjourneyPrompts && image.midjourneyPrompts.length > 0 ? (
+                    <div className="space-y-6">
+                      {image.midjourneyPrompts.map((prompt, index) => (
+                        <PromptCard
+                          key={index}
+                          prompt={prompt}
+                          index={index}
+                          onCopy={copyToClipboard}
+                          copied={copiedIndex === index}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-6">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <MessageSquare className="h-6 w-6 text-yellow-400" />
+                        <div>
+                          <h4 className="text-lg font-semibold text-yellow-300">No Prompts Found</h4>
+                          <p className="text-yellow-200/80 text-sm">Could not extract Midjourney prompts from the response. Check the ChatGPT Response tab for the original output.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* ChatGPT Response Tab */}
+                <div className={`transition-all duration-300 ease-in-out ${
+                  activeTab === 'chatgpt' 
+                    ? 'opacity-100 translate-x-0' 
+                    : 'opacity-0 -translate-x-4 absolute inset-0 pointer-events-none'
+                }`}>
+                  {image.prompt ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-semibold text-white">Original AI Response</h4>
+                        <button
+                          onClick={copyChatGPTResponse}
+                          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
+                        >
+                          {chatGPTResponseCopied ? (
+                            <>
+                              <Check className="h-4 w-4" />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+                        <pre className="text-gray-200 whitespace-pre-wrap break-words font-mono text-sm leading-relaxed">
+                          {image.prompt}
+                        </pre>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No ChatGPT response available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
     </div>
   );
 }

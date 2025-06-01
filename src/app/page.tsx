@@ -82,8 +82,8 @@ export default function Home() {
             
             // Update individual image status
             if (data.itemResult) {
-              setImages(prevImages => 
-                prevImages.map(img => 
+              setImages(prevImages => {
+                const updatedImages = prevImages.map(img => 
                   img.id === data.itemResult.id 
                     ? { 
                         ...img, 
@@ -93,8 +93,34 @@ export default function Home() {
                         error: data.itemResult.error
                       }
                     : img
-                )
-              );
+                );
+                
+                // Move completed/error image to completed list immediately
+                const completedImage = updatedImages.find(img => 
+                  img.id === data.itemResult.id && 
+                  (img.status === 'completed' || img.status === 'error')
+                );
+                
+                if (completedImage) {
+                  setCompletedImages(prev => {
+                    // Check if this image is already in completed list
+                    if (!prev.some(img => img.id === completedImage.id)) {
+                      setCompletedIdCounter(prevCounter => prevCounter + 1);
+                      return [...prev, {
+                        ...completedImage,
+                        completedId: completedIdCounter,
+                        generatedAt: new Date(),
+                      }];
+                    }
+                    return prev;
+                  });
+                  
+                  // Remove from active images
+                  return updatedImages.filter(img => img.id !== data.itemResult.id);
+                }
+                
+                return updatedImages;
+              });
             }
             break;
             
@@ -212,25 +238,32 @@ export default function Home() {
       // Wait a moment for final SSE updates to arrive
       setTimeout(() => {
         setImages(currentImages => {
-          // Move completed images to persistent completed list
-          const completedImages = currentImages.filter(
+          // Move any remaining completed images to persistent completed list (fallback)
+          const remainingCompletedImages = currentImages.filter(
             (img) => img.status === "completed" || img.status === "error"
           );
           
-          if (completedImages.length > 0) {
+          if (remainingCompletedImages.length > 0) {
             setCompletedImages((prev) => {
-              const imagesWithNewIds = completedImages.map((img, index) => ({
-                ...img,
-                completedId: completedIdCounter + index,
-                generatedAt: new Date(),
-              }));
-              return [...prev, ...imagesWithNewIds];
+              // Filter out any images that are already in the completed list
+              const existingIds = prev.map(img => img.id);
+              const newCompletedImages = remainingCompletedImages.filter(img => !existingIds.includes(img.id));
+              
+              if (newCompletedImages.length > 0) {
+                const imagesWithNewIds = newCompletedImages.map((img, index) => ({
+                  ...img,
+                  completedId: completedIdCounter + index,
+                  generatedAt: new Date(),
+                }));
+                setCompletedIdCounter((prevCounter) => prevCounter + newCompletedImages.length);
+                return [...prev, ...imagesWithNewIds];
+              }
+              
+              return prev;
             });
-            
-            setCompletedIdCounter((prev) => prev + completedImages.length);
           }
           
-          // Return empty array to clear active images
+          // Return empty array to clear any remaining active images
           return [];
         });
         
