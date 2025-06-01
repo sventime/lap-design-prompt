@@ -172,7 +172,7 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
                 setFiles([]);
                 onFilesUpload([]);
               }}
-              className="text-sm text-red-400 hover:text-red-300 font-medium px-4 py-2 rounded-lg hover:bg-red-500/10 transition-colors"
+              className="text-sm text-red-400 hover:text-red-300 font-medium px-4 py-2 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
             >
               Clear All
             </button>
@@ -191,7 +191,7 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
                   
                   <button
                     onClick={() => removeFile(file.id)}
-                    className="absolute top-3 right-3 bg-red-500/80 backdrop-blur-sm text-white rounded-full p-2 hover:bg-red-500 transition-all hover:scale-110"
+                    className="absolute top-3 right-3 bg-red-500/80 backdrop-blur-sm text-white rounded-full p-2 hover:bg-red-500 transition-all hover:scale-110 cursor-pointer"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -219,17 +219,35 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
                     {file.file.name}
                   </div>
                   
-                  <select
-                    value={file.promptType}
-                    onChange={(e) => updatePromptType(file.id, e.target.value as PromptType)}
-                    className="w-full text-sm bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                  >
-                    {PROMPT_TYPES.map((type) => (
-                      <option key={type.value} value={type.value} className="bg-gray-800">
-                        {type.label} - {type.description}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Prompt Type Toggle */}
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-400 font-medium">Prompt Type</div>
+                    <div className="relative bg-gray-800 border border-gray-600 rounded-lg p-1 flex">
+                      <button
+                        onClick={() => updatePromptType(file.id, 'texture')}
+                        className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
+                          file.promptType === 'texture'
+                            ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-lg'
+                            : 'text-gray-400 hover:text-gray-300'
+                        }`}
+                      >
+                        Texture
+                      </button>
+                      <button
+                        onClick={() => updatePromptType(file.id, 'outfit')}
+                        className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
+                          file.promptType === 'outfit'
+                            ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg'
+                            : 'text-gray-400 hover:text-gray-300'
+                        }`}
+                      >
+                        Outfit
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {file.promptType === 'texture' ? 'Material and texture focus' : 'Complete outfit visualization'}
+                    </div>
+                  </div>
                   
                   <select
                     value={file.clothingPart}

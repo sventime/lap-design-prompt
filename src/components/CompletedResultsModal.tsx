@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { X, Download, ExternalLink } from 'lucide-react';
-import { UploadedImage } from '@/types';
+import { UploadedImage, formatFileSize } from '@/types';
 
 interface CompletedResultsModalProps {
   isOpen: boolean;
@@ -42,7 +42,7 @@ export default function CompletedResultsModal({
             {completedImages.some(img => img.status === 'completed') && (
               <button
                 onClick={onDownloadAll}
-                className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-500 hover:to-teal-500 font-medium transition-all hover:scale-105 shadow-lg"
+                className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-500 hover:to-teal-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
               >
                 <Download className="h-5 w-5" />
                 <span>Download All</span>
@@ -50,7 +50,7 @@ export default function CompletedResultsModal({
             )}
             <button
               onClick={onClose}
-              className="p-3 text-gray-400 hover:text-white rounded-xl hover:bg-gray-800/50 transition-all"
+              className="p-3 text-gray-400 hover:text-white rounded-xl hover:bg-gray-800/50 transition-all cursor-pointer"
             >
               <X className="h-6 w-6" />
             </button>
@@ -117,7 +117,7 @@ export default function CompletedResultsModal({
                             ? image.customClothingPart 
                             : image.clothingPart}
                         </span>
-                        <span>{(image.file.size / 1024 / 1024).toFixed(1)}MB</span>
+                        <span>{formatFileSize(image.file.size)}</span>
                         {image.midjourneyPrompts && (
                           <span className="text-emerald-400 font-medium">
                             {image.midjourneyPrompts.length} prompts generated
@@ -137,7 +137,7 @@ export default function CompletedResultsModal({
                       {image.status === 'completed' && (
                         <button
                           onClick={() => onViewResults(image)}
-                          className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg"
+                          className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
                         >
                           View Prompts
                         </button>

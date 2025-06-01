@@ -6,7 +6,7 @@ import FileUpload from "@/components/FileUpload";
 import ProcessingProgress from "@/components/ProcessingProgress";
 import ResultsModal from "@/components/ResultsModal";
 import CompletedResultsModal from "@/components/CompletedResultsModal";
-import { UploadedImage } from "@/types";
+import { UploadedImage, formatFileSize } from "@/types";
 
 export default function Home() {
   const [images, setImages] = useState<UploadedImage[]>([]);
@@ -374,7 +374,7 @@ export default function Home() {
                   <div className="flex items-center space-x-3">
                     <button
                       onClick={() => setShowCompletedModal(true)}
-                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg"
+                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
                     >
                       <List className="h-5 w-5" />
                       <span>View All</span>
@@ -384,7 +384,7 @@ export default function Home() {
                     ) && (
                       <button
                         onClick={downloadAllResults}
-                        className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-500 hover:to-teal-500 font-medium transition-all hover:scale-105 shadow-lg"
+                        className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-500 hover:to-teal-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
                       >
                         <Download className="h-5 w-5" />
                         <span>Download All</span>
@@ -452,7 +452,7 @@ export default function Home() {
                           {image.promptType === "outfit" ? "Outfit" : "Texture"}
                         </span>
                         <span className="text-sm text-gray-300">
-                          {(image.file.size / 1024 / 1024).toFixed(1)}MB
+                          {formatFileSize(image.file.size)}
                         </span>
                       </div>
                       {image.error && (
@@ -481,7 +481,7 @@ export default function Home() {
                           </div>
                           <button
                             onClick={() => handleViewResults(image)}
-                            className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg"
+                            className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
                           >
                             View Results
                           </button>
@@ -529,7 +529,7 @@ export default function Home() {
               <button
                 onClick={handleProcessAll}
                 disabled={isProcessing || images.length === 0}
-                className="group btn-premium flex items-center space-x-3 px-8 py-4 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl"
+                className="group btn-premium flex items-center space-x-3 px-8 py-4 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl cursor-pointer"
               >
                 <Wand2
                   className={`h-6 w-6 ${

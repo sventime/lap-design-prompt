@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
-import { UploadedImage } from '@/types';
+import { UploadedImage, formatFileSize } from '@/types';
 
 interface ProcessingProgressProps {
   images: UploadedImage[];
@@ -155,7 +155,7 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
                     {image.promptType === 'outfit' ? 'Outfit' : 'Texture'}
                   </span>
                   <span className="text-sm text-gray-300">
-                    {(image.file.size / 1024 / 1024).toFixed(1)}MB
+                    {formatFileSize(image.file.size)}
                   </span>
                 </div>
                 {image.error && (
@@ -184,7 +184,7 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
                     <CheckCircle className="h-6 w-6 text-emerald-400" />
                     <button
                       onClick={() => onViewResults(image)}
-                      className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg"
+                      className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
                     >
                       View Results
                     </button>

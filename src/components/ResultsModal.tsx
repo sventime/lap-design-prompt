@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Download, Zap } from 'lucide-react';
-import { UploadedImage } from '@/types';
+import { UploadedImage, formatFileSize } from '@/types';
 import PromptCard from './PromptCard';
 
 interface ResultsModalProps {
@@ -85,21 +85,21 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
           <div className="flex items-center space-x-4">
             <button
               onClick={copyAllPrompts}
-              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-500 hover:to-pink-500 font-medium transition-all hover:scale-105 shadow-lg"
+              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-500 hover:to-pink-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
             >
               <Zap className="h-5 w-5" />
               <span>{copiedIndex === -1 ? 'Copied!' : 'Copy All'}</span>
             </button>
             <button
               onClick={downloadPrompts}
-              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-500 hover:to-blue-500 font-medium transition-all hover:scale-105 shadow-lg"
+              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-500 hover:to-blue-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
             >
               <Download className="h-5 w-5" />
               <span>Download</span>
             </button>
             <button
               onClick={onClose}
-              className="p-3 text-gray-400 hover:text-white rounded-xl hover:bg-gray-800/50 transition-all"
+              className="p-3 text-gray-400 hover:text-white rounded-xl hover:bg-gray-800/50 transition-all cursor-pointer"
             >
               <X className="h-6 w-6" />
             </button>
@@ -118,7 +118,7 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
               />
               <button
                 onClick={downloadImage}
-                className="absolute bottom-3 right-3 p-3 rounded-xl backdrop-blur-sm border transition-all hover:scale-110 bg-gray-800/80 text-gray-300 border-gray-600 hover:bg-gray-700/80 hover:text-white"
+                className="absolute bottom-3 right-3 p-3 rounded-xl backdrop-blur-sm border transition-all hover:scale-110 bg-gray-800/80 text-gray-300 border-gray-600 hover:bg-gray-700/80 hover:text-white cursor-pointer"
                 title="Download image"
               >
                 <Download className="h-5 w-5" />
@@ -129,7 +129,7 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
                 ? image.customClothingPart 
                 : image.clothingPart}</p>
               <p><strong className="text-white">Prompt Type:</strong> {image.promptType === 'outfit' ? 'Complete Outfit' : 'Material Texture'}</p>
-              <p><strong className="text-white">Size:</strong> {(image.file.size / 1024 / 1024).toFixed(1)}MB</p>
+              <p><strong className="text-white">Size:</strong> {formatFileSize(image.file.size)}</p>
             </div>
           </div>
 

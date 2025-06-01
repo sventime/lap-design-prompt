@@ -42,7 +42,7 @@ export default function PromptCard({ prompt, index, onCopy, copied }: PromptCard
               e.stopPropagation();
               onCopy(prompt, index);
             }}
-            className="p-3 text-gray-400 hover:text-white rounded-xl hover:bg-gray-800/50 transition-all hover:scale-110"
+            className="p-3 text-gray-400 hover:text-white rounded-xl hover:bg-gray-800/50 transition-all hover:scale-110 cursor-pointer"
             title="Copy to clipboard"
           >
             {copied ? (
@@ -56,7 +56,7 @@ export default function PromptCard({ prompt, index, onCopy, copied }: PromptCard
               e.stopPropagation();
               openInMidjourney();
             }}
-            className="p-3 text-gray-400 hover:text-indigo-400 rounded-xl hover:bg-gray-800/50 transition-all hover:scale-110"
+            className="p-3 text-gray-400 hover:text-indigo-400 rounded-xl hover:bg-gray-800/50 transition-all hover:scale-110 cursor-pointer"
             title="Open Midjourney"
           >
             <ExternalLink className="h-5 w-5" />
