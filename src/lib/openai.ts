@@ -36,15 +36,27 @@ Requirements:
 - Use contrasting background to highlight the ${clothingPart}
 - Use parameters like --ar 2:3 --q 2 --s 250
 
-Also create 10 product names for marketplace:
-Format: "English Name | Russian Translation"
-Example: "Navy Blue Jeans | Темно-синие джинсы"
+IMPORTANT FORMATTING:
+- Each prompt must be on a SINGLE LINE
+- Format: "PROMPT1: [full prompt description] --ar 2:3 --q 2 --s 250"
+- Format: "PROMPT2: [full prompt description] --ar 2:3 --q 2 --s 250"
+- Format: "PROMPT3: [full prompt description] --ar 2:3 --q 2 --s 250"
+
+Also create 10 product names:
+Format: "NAME1: English Name | Russian Translation"
+Example: "NAME1: Navy Blue Jeans | Темно-синие джинсы"
 - Always end with clothing item name
 - Include descriptive details` : `Create 3 macro texture prompts for ${clothingPart} fabric.
 Requirements:
 - Extreme close-up of fabric only
 - Fill entire frame with texture
 - Use --ar 1:1 --q 2
+
+IMPORTANT FORMATTING:
+- Each prompt must be on a SINGLE LINE
+- Format: "PROMPT1: [full prompt description] --ar 1:1 --q 2"
+- Format: "PROMPT2: [full prompt description] --ar 1:1 --q 2"
+- Format: "PROMPT3: [full prompt description] --ar 1:1 --q 2"
 `}
 
 Do not include /imagine command.`,
@@ -83,8 +95,8 @@ Do not include /imagine command.`,
     // Extract individual prompts from the response
     const prompts = content
       .split('\n')
-      .filter(line => line.trim() && (line.includes('--ar') || line.includes('--q') || line.includes('--s')))
-      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(line => line.trim() && line.startsWith('PROMPT'))
+      .map(line => line.replace(/^PROMPT\d+:\s*/, '').trim())
       .filter(prompt => prompt.length > 0);
 
     // Extract outfit names (only for outfit type)
@@ -92,9 +104,9 @@ Do not include /imagine command.`,
     if (promptType === "outfit") {
       outfitNames = content
         .split('\n')
-        .filter(line => line.trim() && line.includes('|'))
-        .map(line => line.replace(/^\d+\.\s*/, '').trim())
-        .filter(name => name.length > 0 && !name.includes('--'))
+        .filter(line => line.trim() && line.startsWith('NAME'))
+        .map(line => line.replace(/^NAME\d+:\s*/, '').trim())
+        .filter(name => name.length > 0)
         .slice(0, 10);
     }
 

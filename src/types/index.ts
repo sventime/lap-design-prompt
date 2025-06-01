@@ -14,6 +14,7 @@ export interface UploadedImage {
   error?: string;
   completedId?: number;
   generatedAt?: Date;
+  processingId?: string;
 }
 
 export type ClothingPart = 'top' | 'bottom' | 'shoes' | 'accessories' | 'dress' | 'outerwear' | 'hair' | 'features' | 'other';

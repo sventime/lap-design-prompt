@@ -20,151 +20,206 @@ export default function Home() {
   );
   const [showResults, setShowResults] = useState(false);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
-  
+
   // Real-time progress state
   const [progressData, setProgressData] = useState({
     total: 0,
     completed: 0,
     processing: 0,
-    status: '',
-    currentItem: null as any
+    status: "",
+    currentItem: null as any,
   });
-  const [sessionId, setSessionId] = useState('');
+  const [sessionId, setSessionId] = useState("");
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
-  
 
   // Setup SSE connection
   const setupSSEConnection = (sessionId: string) => {
     console.log(`[SSE] Setting up connection for session: ${sessionId}`);
     const es = new EventSource(`/api/progress?sessionId=${sessionId}`);
-    
+
     es.onopen = () => {
-      console.log('[SSE] Connection opened');
+      console.log("[SSE] Connection opened successfully");
     };
-    
+
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('[SSE] Received message:', data);
-        
+        console.log("[SSE] Received message:", data);
+
         switch (data.type) {
-          case 'connected':
-            console.log('[SSE] Connected to progress stream');
+          case "connected":
+            console.log("[SSE] Connected to progress stream");
             break;
-            
-          case 'batch_started':
+
+          case "batch_started":
             setProgressData({
               total: data.total,
               completed: 0,
               processing: 0,
               status: data.status,
-              currentItem: null
+              currentItem: null,
             });
             break;
-            
-          case 'progress_update':
+
+          case "progress_update":
+            console.log("[SSE] Progress update:", {
+              total: data.total,
+              completed: data.completed,
+              processing: data.processing,
+              status: data.status,
+            });
             setProgressData({
               total: data.total,
               completed: data.completed,
               processing: data.processing,
               status: data.status,
-              currentItem: data.currentItem
+              currentItem: data.currentItem,
             });
             break;
-            
-          case 'item_completed':
-          case 'item_failed':
+
+          case "item_completed":
+          case "item_failed":
+            console.log("[SSE] Item completed/failed:", {
+              type: data.type,
+              total: data.total,
+              completed: data.completed,
+              processing: data.processing,
+              itemId: data.itemResult?.id,
+            });
             setProgressData({
               total: data.total,
               completed: data.completed,
               processing: data.processing,
               status: data.status,
-              currentItem: null
+              currentItem: null,
             });
-            
+
             // Update individual image status
             if (data.itemResult) {
-              setImages(prevImages => {
-                const updatedImages = prevImages.map(img => 
-                  img.id === data.itemResult.id 
-                    ? { 
-                        ...img, 
-                        status: data.itemResult.success ? 'completed' : 'error',
+              setImages((prevImages) => {
+                const updatedImages = prevImages.map((img) =>
+                  img.id === data.itemResult.id
+                    ? {
+                        ...img,
+                        status: data.itemResult.success ? "completed" : "error",
                         prompt: data.itemResult.prompt,
                         midjourneyPrompts: data.itemResult.midjourneyPrompts,
                         outfitNames: data.itemResult.outfitNames,
-                        error: data.itemResult.error
+                        error: data.itemResult.error,
                       }
                     : img
                 );
-                
+
                 // Move completed/error image to completed list immediately
-                const completedImage = updatedImages.find(img => 
-                  img.id === data.itemResult.id && 
-                  (img.status === 'completed' || img.status === 'error')
+                const completedImage = updatedImages.find(
+                  (img) =>
+                    img.id === data.itemResult.id &&
+                    (img.status === "completed" || img.status === "error")
                 );
-                
+
                 if (completedImage) {
-                  setCompletedImages(prev => {
-                    // Check if this image is already in completed list
-                    if (!prev.some(img => img.id === completedImage.id)) {
-                      setCompletedIdCounter(prevCounter => prevCounter + 1);
-                      
-                      return [...prev, {
-                        ...completedImage,
-                        completedId: completedIdCounter,
-                        generatedAt: new Date(),
-                      }];
+                  console.log(
+                    "[SSE] Adding completed image to results:",
+                    completedImage.id
+                  );
+                  setCompletedImages((prev) => {
+                    // Check if this specific item result was already processed in this session
+                    const itemResultId = `${data.itemResult.id}_${
+                      data.itemResult.success ? "success" : "error"
+                    }_${sessionId}`;
+                    const alreadyExists = prev.some((img) =>
+                      img.processingId?.includes(itemResultId)
+                    );
+
+                    if (alreadyExists) {
+                      console.log(
+                        "[SSE] Duplicate item result detected, skipping:",
+                        itemResultId
+                      );
+                      return prev;
                     }
-                    return prev;
+
+                    // Always add as new record - each processing should create separate entry
+                    const newCompletedId = prev.length + 1;
+                    setCompletedIdCounter(newCompletedId);
+
+                    const newCompletedImage = {
+                      ...completedImage,
+                      completedId: newCompletedId,
+                      generatedAt: new Date(),
+                      processingId: itemResultId, // Use the consistent ID to prevent duplicates
+                    };
+
+                    console.log(
+                      "[SSE] Created completed image with ID:",
+                      newCompletedImage.completedId,
+                      "processingId:",
+                      newCompletedImage.processingId
+                    );
+
+                    return [...prev, newCompletedImage];
                   });
-                  
+
                   // Remove from active images
-                  return updatedImages.filter(img => img.id !== data.itemResult.id);
+                  return updatedImages.filter(
+                    (img) => img.id !== data.itemResult.id
+                  );
                 }
-                
+
                 return updatedImages;
               });
             }
             break;
-            
-          case 'batch_completed':
+
+          case "batch_completed":
+            console.log("[SSE] Batch completed - cleaning up");
             setProgressData({
               total: data.total,
               completed: data.completed,
               processing: 0,
               status: data.status,
-              currentItem: null
+              currentItem: null,
             });
-            
+
+            // Mark processing as complete
+            setIsProcessing(false);
+
+            // Clean up SSE connection after a brief delay
+            setTimeout(() => {
+              es.close();
+              setEventSource(null);
+            }, 1000);
+
             // Smooth scroll to top when all images are processed
             window.scrollTo({
               top: 0,
-              behavior: 'smooth'
+              behavior: "smooth",
             });
             break;
-            
-          case 'ping':
+
+          case "ping":
             // Keep-alive ping, do nothing
             break;
-            
+
           default:
-            console.log('[SSE] Unknown message type:', data.type);
+            console.log("[SSE] Unknown message type:", data.type);
         }
       } catch (error) {
-        console.error('[SSE] Error parsing progress data:', error);
+        console.error("[SSE] Error parsing progress data:", error);
       }
     };
-    
+
     es.onerror = (error) => {
-      console.error('[SSE] Connection error:', error);
+      console.error("[SSE] Connection error:", error);
+      console.log("[SSE] EventSource readyState:", es.readyState);
       // Fallback: Enable basic progress tracking
-      setProgressData(prev => ({
+      setProgressData((prev) => ({
         ...prev,
-        status: 'Connection error - using fallback tracking'
+        status: "Connection error - using fallback tracking",
       }));
+      // Don't close the connection here, let it retry
     };
-    
+
     setEventSource(es);
     return es;
   };
@@ -184,22 +239,29 @@ export default function Home() {
     }
 
     // Generate unique session ID for this batch
-    const newSessionId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newSessionId = `batch_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     setSessionId(newSessionId);
 
+    // Clean up any existing SSE connection before starting new one
+    cleanupSSEConnection();
 
     // Setup SSE connection for real-time progress
     const es = setupSSEConnection(newSessionId);
 
     setIsProcessing(true);
-    
+
+    // Wait a moment for SSE connection to establish
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // Initialize progress data
     setProgressData({
       total: images.length,
       completed: 0,
       processing: 0,
-      status: 'Starting batch processing...',
-      currentItem: null
+      status: "Starting batch processing...",
+      currentItem: null,
     });
 
     // Update all images to pending status initially
@@ -230,61 +292,34 @@ export default function Home() {
         };
       });
 
+      console.log(
+        "[PROCESSING] Starting batch processing with sessionId:",
+        newSessionId
+      );
+      console.log("[PROCESSING] Batch items count:", batchItems.length);
+
       const response = await fetch("/api/process-batch", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           items: batchItems,
-          sessionId: newSessionId
+          sessionId: newSessionId,
         }),
       });
+
+      console.log("[PROCESSING] Batch response status:", response.status);
 
       if (!response.ok) {
         throw new Error("Batch processing failed");
       }
 
       const data = await response.json();
-      
-      // Wait a moment for final SSE updates to arrive
-      setTimeout(() => {
-        setImages(currentImages => {
-          // Move any remaining completed images to persistent completed list (fallback)
-          const remainingCompletedImages = currentImages.filter(
-            (img) => img.status === "completed" || img.status === "error"
-          );
-          
-          if (remainingCompletedImages.length > 0) {
-            setCompletedImages((prev) => {
-              // Filter out any images that are already in the completed list
-              const existingIds = prev.map(img => img.id);
-              const newCompletedImages = remainingCompletedImages.filter(img => !existingIds.includes(img.id));
-              
-              if (newCompletedImages.length > 0) {
-                const imagesWithNewIds = newCompletedImages.map((img, index) => ({
-                  ...img,
-                  completedId: completedIdCounter + index,
-                  generatedAt: new Date(),
-                }));
-                setCompletedIdCounter((prevCounter) => prevCounter + newCompletedImages.length);
-                return [...prev, ...imagesWithNewIds];
-              }
-              
-              return prev;
-            });
-          }
-          
-          // Return empty array to clear any remaining active images
-          return [];
-        });
-        
-        // Cleanup SSE connection
-        es.close();
-        setEventSource(null);
-        setIsProcessing(false);
-      }, 1000);
 
+      console.log(
+        "[PROCESSING] Batch HTTP request completed, waiting for SSE batch_completed message..."
+      );
     } catch (error) {
       console.error("Processing error:", error);
       alert("Processing failed. Please try again.");
@@ -295,7 +330,7 @@ export default function Home() {
         status: "pending" as const,
       }));
       setImages(resetImages);
-      
+
       // Cleanup SSE connection on error
       es.close();
       setEventSource(null);
@@ -450,125 +485,132 @@ export default function Home() {
                     return bId - aId;
                   })
                   .map((image) => (
-                  <div
-                    key={`completed-${image.completedId || image.id}`}
-                    className="p-6 flex items-center space-x-6 hover:bg-gray-800/20 transition-colors"
-                  >
-                    {/* Image Thumbnail */}
-                    <div className="relative">
-                      <img
-                        src={image.preview}
-                        alt={image.file.name}
-                        className="w-20 h-20 object-cover rounded-xl border border-gray-700/50"
-                      />
-                      <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 to-transparent"></div>
-                    </div>
+                    <div
+                      key={`completed-${
+                        image.processingId || image.completedId || image.id
+                      }`}
+                      className="p-6 flex items-center space-x-6 hover:bg-gray-800/20 transition-colors"
+                    >
+                      {/* Image Thumbnail */}
+                      <div className="relative">
+                        <img
+                          src={image.preview}
+                          alt={image.file.name}
+                          className="w-20 h-20 object-cover rounded-xl border border-gray-700/50"
+                        />
+                        <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 to-transparent"></div>
+                      </div>
 
-                    {/* Image Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3 mb-1">
-                        <div className="text-lg font-medium text-white">
-                          #{image.completedId}
-                        </div>
-                        <div className="text-sm text-gray-400">
-                          {image.generatedAt
-                            ? image.generatedAt.toLocaleDateString() +
-                              " " +
-                              image.generatedAt.toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                            : ""}
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-300 truncate mb-2">
-                        {image.file.name}
-                      </div>
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-sm text-gray-300">
-                          {image.clothingPart === "other" &&
-                          image.customClothingPart
-                            ? image.customClothingPart
-                            : image.clothingPart}
-                        </span>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium border ${
-                            image.promptType === "outfit"
-                              ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
-                              : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                          }`}
-                        >
-                          {image.promptType === "outfit" ? "Outfit" : "Texture"}
-                        </span>
-                        <span className="text-sm text-gray-300">
-                          {formatFileSize(image.file.size)}
-                        </span>
-                      </div>
-                      {image.error && (
-                        <div className="text-sm text-red-400 bg-red-500/10 px-3 py-1 rounded-lg border border-red-500/20">
-                          {image.error}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Status Icon */}
-                    <div className="flex items-center space-x-3">
-                      {image.status === "completed" && (
-                        <div className="flex items-center space-x-3">
-                          <div className="h-6 w-6 text-emerald-400">
-                            <svg
-                              className="w-full h-full"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
+                      {/* Image Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-3 mb-1">
+                          <div className="text-lg font-medium text-white">
+                            #{image.completedId}
                           </div>
-                          <button
-                            onClick={() => handleViewResults(image)}
-                            className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
+                          <div className="text-sm text-gray-400">
+                            {image.generatedAt
+                              ? image.generatedAt.toLocaleDateString() +
+                                " " +
+                                image.generatedAt.toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : ""}
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-300 truncate mb-2">
+                          {image.file.name}
+                        </div>
+                        {image.genderType && (
+                          <div className="text-xs text-gray-400 mb-1">
+                            {image.genderType} • {image.promptType}
+                            {image.guidance && ` • "${image.guidance}"`}
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="text-sm text-gray-300">
+                            {image.clothingPart === "other" &&
+                            image.customClothingPart
+                              ? image.customClothingPart
+                              : image.clothingPart}
+                          </span>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium border ${
+                              image.promptType === "outfit"
+                                ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                            }`}
                           >
-                            View Results
-                          </button>
-                        </div>
-                      )}
-                      {image.status === "error" && (
-                        <div className="flex items-center space-x-2">
-                          <div className="h-6 w-6 text-red-400">
-                            <svg
-                              className="w-full h-full"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </div>
-                          <span className="text-sm text-red-400 font-medium">
-                            Failed
+                            {image.promptType === "outfit"
+                              ? "Outfit"
+                              : "Texture"}
+                          </span>
+                          <span className="text-sm text-gray-300">
+                            {formatFileSize(image.file.size)}
                           </span>
                         </div>
-                      )}
+                        {image.error && (
+                          <div className="text-sm text-red-400 bg-red-500/10 px-3 py-1 rounded-lg border border-red-500/20">
+                            {image.error}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Status Icon */}
+                      <div className="flex items-center space-x-3">
+                        {image.status === "completed" && (
+                          <div className="flex items-center space-x-3">
+                            <div className="h-6 w-6 text-emerald-400">
+                              <svg
+                                className="w-full h-full"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </div>
+                            <button
+                              onClick={() => handleViewResults(image)}
+                              className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
+                            >
+                              View Results
+                            </button>
+                          </div>
+                        )}
+                        {image.status === "error" && (
+                          <div className="flex items-center space-x-2">
+                            <div className="h-6 w-6 text-red-400">
+                              <svg
+                                className="w-full h-full"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </div>
+                            <span className="text-sm text-red-400 font-medium">
+                              Failed
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           )}
 
           {/* File Upload Section */}
           <div className="glass rounded-2xl border border-gray-700/50 p-8">
-            <FileUpload
-              onFilesUpload={setImages}
-              disabled={isProcessing}
-            />
+            <FileUpload onFilesUpload={setImages} disabled={isProcessing} />
           </div>
 
           {/* Action Buttons */}
