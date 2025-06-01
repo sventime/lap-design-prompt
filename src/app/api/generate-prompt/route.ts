@@ -18,7 +18,11 @@ export async function POST(request: NextRequest) {
     const result = await generateMidjourneyPrompt(
       base64Data,
       clothingPart,
-      description || ''
+      description || '',
+      "outfit",
+      "female",
+      undefined,
+      true
     );
 
     return NextResponse.json({
