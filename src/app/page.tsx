@@ -7,10 +7,12 @@ import ProcessingProgress from "@/components/ProcessingProgress";
 import ResultsModal from "@/components/ResultsModal";
 import CompletedResultsModal from "@/components/CompletedResultsModal";
 import { UploadedImage, formatFileSize } from "@/types";
+import { getVersionDisplay } from "@/lib/version";
 
 export default function Home() {
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [completedImages, setCompletedImages] = useState<UploadedImage[]>([]);
+  const { version, buildTime } = getVersionDisplay();
   const [completedIdCounter, setCompletedIdCounter] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<UploadedImage | null>(
@@ -358,8 +360,12 @@ export default function Home() {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
                   3D Clothing Design Automation
                 </h1>
-                <div className="text-xs text-gray-400 font-medium">
-                  Powered by AI
+                <div className="flex items-center space-x-3 text-xs text-gray-400 font-medium">
+                  <span>Powered by AI</span>
+                  <span>•</span>
+                  <span>v{version}</span>
+                  <span>•</span>
+                  <span>{buildTime}</span>
                 </div>
               </div>
             </div>

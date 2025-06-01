@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Auto-increment version on push
+echo "🔄 Auto-incrementing version..."
+
+# Get current version from package.json
+current_version=$(node -p "require('./package.json').version")
+echo "Current version: $current_version"
+
+# Split version into parts (major.minor.patch)
+IFS='.' read -ra VERSION_PARTS <<< "$current_version"
+major=${VERSION_PARTS[0]}
+minor=${VERSION_PARTS[1]}
+patch=${VERSION_PARTS[2]}
+
+# Increment patch version
+new_patch=$((patch + 1))
+new_version="$major.$minor.$new_patch"
+
+echo "New version: $new_version"
+
+# Update package.json
+npm version $new_version --no-git-tag-version
+
+# Set build time environment variable for the build
+export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Add the changes to git
+git add package.json
+
+# Create a commit with the version bump
+git commit -m "🔖 Bump version to $new_version
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+echo "✅ Version bumped to $new_version and committed"

@@ -17,6 +17,7 @@ A Next.js application that automates the process of generating Midjourney prompt
    ```bash
    cd clothing-design-automation
    npm install
+   ./setup-hooks.sh  # Install git hooks for auto-versioning
    ```
 
 2. **Set up environment variables:**
@@ -109,6 +110,19 @@ The application is ready for deployment on Vercel, Netlify, or any platform supp
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
+
+## Auto-Versioning
+
+The application includes automatic version management:
+
+- **Version Display**: Current version and build date shown in the app header
+- **Auto-Increment**: Version automatically increments on every `git push`
+- **Git Hooks**: Pre-push hook handles version bumping and commits
+
+To set up auto-versioning:
+```bash
+./setup-hooks.sh
+```
 
 ## License
 

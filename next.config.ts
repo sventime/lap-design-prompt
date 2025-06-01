@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true, // This allows the build to succeed even if there are ESLint errors
   },
+  env: {
+    BUILD_TIME: new Date().toISOString(),
+  },
 };
 
 export default nextConfig;
