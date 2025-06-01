@@ -4,7 +4,7 @@ A Next.js application that automates the process of generating Midjourney prompt
 
 ## Features
 
-- 📸 **Bulk Image Upload**: Upload up to 30 Pinterest fashion images at once
+- 📸 **Bulk Image Upload**: Upload unlimited Pinterest fashion images at once
 - 🤖 **AI-Powered Prompt Generation**: ChatGPT analyzes images and generates detailed Midjourney prompts
 - 🎯 **Clothing Part Selection**: Specify which part of the outfit to focus on (top, bottom, dress, etc.)
 - 📊 **Progress Tracking**: Real-time progress monitoring for batch processing
@@ -71,22 +71,20 @@ runway fashion look, vintage graphic ringer t-shirt tucked into a high-waisted m
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
-NEXT_PUBLIC_MAX_FILE_SIZE=10485760  # 10MB per file
-NEXT_PUBLIC_MAX_FILES=30            # Maximum 30 files
 ```
 
 ### Supported File Types
 
 - PNG, JPG, JPEG, WebP
-- Maximum file size: 10MB
-- Maximum files per batch: 30
+- No file size limits
+- No file count limits
 
 ## Usage Tips
 
 1. **Image Quality**: Use high-quality Pinterest images for better prompt generation
 2. **Clothing Parts**: Be specific about which part of the outfit you want to focus on
 3. **Batch Processing**: The system processes 5 images at a time to respect API rate limits
-4. **Results**: Each image generates exactly 15 unique Midjourney prompts optimized for 3D design
+4. **Results**: Each image generates exactly 3 unique Midjourney prompts optimized for 3D design
 
 ## Architecture
 

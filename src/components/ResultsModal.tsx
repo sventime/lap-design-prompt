@@ -14,7 +14,7 @@ interface ResultsModalProps {
 
 export default function ResultsModal({ image, isOpen, onClose }: ResultsModalProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'prompts' | 'chatgpt'>('prompts');
+  const [activeTab, setActiveTab] = useState<'prompts' | 'names' | 'raw'>('prompts');
   const [chatGPTResponseCopied, setChatGPTResponseCopied] = useState(false);
 
   // Lock body scroll when modal is open
@@ -136,7 +136,7 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
               <div className="flex items-center space-x-1 bg-gray-800/50 border border-gray-700/50 rounded-xl p-1">
                 <button
                   onClick={() => setActiveTab('prompts')}
-                  className={`flex-1 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-300 cursor-pointer ${
+                  className={`flex-1 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-300 cursor-pointer ${
                     activeTab === 'prompts'
                       ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
                       : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
@@ -144,15 +144,27 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
                 >
                   Prompts ({image.midjourneyPrompts?.length || 0})
                 </button>
+                {image.promptType === 'outfit' && image.outfitNames && image.outfitNames.length > 0 && (
+                  <button
+                    onClick={() => setActiveTab('names')}
+                    className={`flex-1 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-300 cursor-pointer ${
+                      activeTab === 'names'
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg'
+                        : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+                    }`}
+                  >
+                    Outfit Names ({image.outfitNames?.length || 0})
+                  </button>
+                )}
                 <button
-                  onClick={() => setActiveTab('chatgpt')}
-                  className={`flex-1 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-300 cursor-pointer ${
-                    activeTab === 'chatgpt'
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                  onClick={() => setActiveTab('raw')}
+                  className={`flex-1 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-300 cursor-pointer ${
+                    activeTab === 'raw'
+                      ? 'bg-gradient-to-r from-gray-600 to-slate-600 text-white shadow-lg'
                       : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
                   }`}
                 >
-                  ChatGPT Response
+                  Raw Response
                 </button>
               </div>
 
@@ -189,9 +201,54 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
                   )}
                 </div>
 
-                {/* ChatGPT Response Tab */}
+                {/* Outfit Names Tab */}
+                {image.promptType === 'outfit' && (
+                  <div className={`transition-all duration-300 ease-in-out ${
+                    activeTab === 'names' 
+                      ? 'opacity-100 translate-x-0' 
+                      : 'opacity-0 translate-x-4 absolute inset-0 pointer-events-none'
+                  }`}>
+                    {image.outfitNames && image.outfitNames.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-lg font-semibold text-white">Outfit Naming Suggestions</h4>
+                          <span className="text-sm text-emerald-300 font-medium px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30">
+                            English + Russian
+                          </span>
+                        </div>
+                        <div className="grid gap-3">
+                          {image.outfitNames.map((name, index) => (
+                            <div key={index} className="glass border border-gray-700/30 rounded-xl p-4 hover:border-emerald-500/50 transition-all duration-300">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="text-white font-medium text-base">
+                                    {name}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(name)}
+                                  className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800/50 transition-all hover:scale-110 cursor-pointer"
+                                  title="Copy outfit name"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No outfit names available</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Raw Response Tab */}
                 <div className={`transition-all duration-300 ease-in-out ${
-                  activeTab === 'chatgpt' 
+                  activeTab === 'raw' 
                     ? 'opacity-100 translate-x-0' 
                     : 'opacity-0 -translate-x-4 absolute inset-0 pointer-events-none'
                 }`}>

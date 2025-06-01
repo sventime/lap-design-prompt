@@ -10,12 +10,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No files uploaded' }, { status: 400 });
     }
 
-    if (files.length > 30) {
-      return NextResponse.json({ error: 'Maximum 30 files allowed' }, { status: 400 });
-    }
-
-    
-
     const processedFiles = await Promise.all(
       files.map(async (file) => {
         // Convert file to buffer
@@ -24,11 +18,6 @@ export async function POST(request: NextRequest) {
         // Validate file type
         if (!file.type.startsWith('image/')) {
           throw new Error(`Invalid file type: ${file.type}`);
-        }
-
-        // Validate file size (10MB limit)
-        if (file.size > 10 * 1024 * 1024) {
-          throw new Error(`File too large: ${file.name}`);
         }
 
         // Process image with sharp for optimization

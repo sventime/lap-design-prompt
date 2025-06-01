@@ -92,6 +92,7 @@ export default function Home() {
                         status: data.itemResult.success ? 'completed' : 'error',
                         prompt: data.itemResult.prompt,
                         midjourneyPrompts: data.itemResult.midjourneyPrompts,
+                        outfitNames: data.itemResult.outfitNames,
                         error: data.itemResult.error
                       }
                     : img
@@ -108,12 +109,6 @@ export default function Home() {
                     // Check if this image is already in completed list
                     if (!prev.some(img => img.id === completedImage.id)) {
                       setCompletedIdCounter(prevCounter => prevCounter + 1);
-                      
-                      // Smooth scroll to top when image completes
-                      window.scrollTo({
-                        top: 0,
-                        behavior: 'smooth'
-                      });
                       
                       return [...prev, {
                         ...completedImage,
@@ -140,6 +135,12 @@ export default function Home() {
               processing: 0,
               status: data.status,
               currentItem: null
+            });
+            
+            // Smooth scroll to top when all images are processed
+            window.scrollTo({
+              top: 0,
+              behavior: 'smooth'
             });
             break;
             
@@ -222,6 +223,8 @@ export default function Home() {
           clothingPart: image.clothingPart,
           customClothingPart: image.customClothingPart,
           promptType: image.promptType,
+          genderType: image.genderType,
+          guidance: image.guidance,
           description: `Generate ${image.promptType} Midjourney prompts for ${clothingPartDisplay} clothing piece`,
           fileName: image.file.name,
         };
@@ -564,7 +567,6 @@ export default function Home() {
           <div className="glass rounded-2xl border border-gray-700/50 p-8">
             <FileUpload
               onFilesUpload={setImages}
-              maxFiles={30}
               disabled={isProcessing}
             />
           </div>

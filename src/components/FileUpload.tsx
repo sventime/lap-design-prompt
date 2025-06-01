@@ -3,11 +3,10 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
-import { UploadedImage, ClothingPart, PromptType } from '@/types';
+import { UploadedImage, ClothingPart, PromptType, GenderType } from '@/types';
 
 interface FileUploadProps {
   onFilesUpload: (files: UploadedImage[]) => void;
-  maxFiles?: number;
   disabled?: boolean;
 }
 
@@ -28,15 +27,11 @@ const PROMPT_TYPES: { value: PromptType; label: string; description: string }[] 
   { value: 'outfit', label: 'Outfit', description: 'Complete outfit visualization' },
 ];
 
-export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = false }: FileUploadProps) {
+export default function FileUpload({ onFilesUpload, disabled = false }: FileUploadProps) {
   const [files, setFiles] = useState<UploadedImage[]>([]);
   const [uploading, setUploading] = useState(false);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (files.length + acceptedFiles.length > maxFiles) {
-      alert(`Maximum ${maxFiles} files allowed`);
-      return;
-    }
 
     setUploading(true);
 
@@ -63,6 +58,7 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
         preview: file.preview,
         clothingPart: 'top' as ClothingPart,
         promptType: 'outfit' as PromptType,
+        genderType: 'female' as GenderType,
         status: 'pending' as const,
       }));
 
@@ -75,7 +71,7 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
     } finally {
       setUploading(false);
     }
-  }, [files, maxFiles, onFilesUpload]);
+  }, [files, onFilesUpload]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -116,6 +112,22 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
     onFilesUpload(updatedFiles);
   };
 
+  const updateGenderType = (id: string, genderType: GenderType) => {
+    const updatedFiles = files.map(file =>
+      file.id === id ? { ...file, genderType } : file
+    );
+    setFiles(updatedFiles);
+    onFilesUpload(updatedFiles);
+  };
+
+  const updateGuidance = (id: string, guidance: string) => {
+    const updatedFiles = files.map(file =>
+      file.id === id ? { ...file, guidance } : file
+    );
+    setFiles(updatedFiles);
+    onFilesUpload(updatedFiles);
+  };
+
   return (
     <div className="w-full space-y-6">
       {/* Drop Zone */}
@@ -142,10 +154,10 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
             {isDragActive ? 'Drop your images here' : 'Upload Pinterest Images'}
           </div>
           <p className="text-gray-300 text-lg mb-2">
-            Drag and drop up to {maxFiles} images, or click to select files
+            Drag and drop images, or click to select files
           </p>
           <p className="text-sm text-gray-400">
-            Supports PNG, JPG, JPEG, WebP (max 10MB each)
+            Supports PNG, JPG, JPEG, WebP
           </p>
         </div>
       </div>
@@ -165,7 +177,7 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-white">
-              Uploaded Images ({files.length}/{maxFiles})
+              Uploaded Images ({files.length})
             </h3>
             <button
               onClick={() => {
@@ -221,7 +233,6 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
                   
                   {/* Prompt Type Toggle */}
                   <div className="space-y-2">
-                    <div className="text-xs text-gray-400 font-medium">Prompt Type</div>
                     <div className="relative bg-gray-800 border border-gray-600 rounded-lg p-1 flex">
                       <button
                         onClick={() => updatePromptType(file.id, 'outfit')}
@@ -244,22 +255,51 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
                         Texture
                       </button>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {file.promptType === 'texture' ? 'Material and texture focus' : 'Complete outfit visualization'}
-                    </div>
                   </div>
+
+                  {/* Gender Toggle - Only show for outfit type */}
+                  {file.promptType === 'outfit' && (
+                    <div className="space-y-2">
+                      <div className="relative bg-gray-800 border border-gray-600 rounded-lg p-1 flex">
+                        <button
+                          onClick={() => updateGenderType(file.id, 'female')}
+                          className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
+                            file.genderType === 'female'
+                              ? 'bg-gradient-to-r from-pink-600 to-rose-500 text-white shadow-lg'
+                              : 'text-gray-400 hover:text-gray-300'
+                          }`}
+                        >
+                          Female
+                        </button>
+                        <button
+                          onClick={() => updateGenderType(file.id, 'male')}
+                          className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
+                            file.genderType === 'male'
+                              ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg'
+                              : 'text-gray-400 hover:text-gray-300'
+                          }`}
+                        >
+                          Male
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   
-                  <select
-                    value={file.clothingPart}
-                    onChange={(e) => updateClothingPart(file.id, e.target.value as ClothingPart)}
-                    className="w-full text-sm bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                  >
-                    {CLOTHING_PARTS.map((part) => (
-                      <option key={part.value} value={part.value} className="bg-gray-800">
-                        {part.label}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Focus on Dropdown */}
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-400 font-medium">Focus on</div>
+                    <select
+                      value={file.clothingPart}
+                      onChange={(e) => updateClothingPart(file.id, e.target.value as ClothingPart)}
+                      className="w-full text-sm bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                    >
+                      {CLOTHING_PARTS.map((part) => (
+                        <option key={part.value} value={part.value} className="bg-gray-800">
+                          {part.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   
                   {file.clothingPart === 'other' && (
                     <input
@@ -270,6 +310,18 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
                       className="w-full text-sm bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                     />
                   )}
+
+                  {/* Additional Guidance Field */}
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-400 font-medium">Additional Guidance (Optional)</div>
+                    <input
+                      type="text"
+                      placeholder="e.g., blue colors, casual style, winter season..."
+                      value={file.guidance || ''}
+                      onChange={(e) => updateGuidance(file.id, e.target.value)}
+                      className="w-full text-sm bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                    />
+                  </div>
                 </div>
               </div>
             ))}

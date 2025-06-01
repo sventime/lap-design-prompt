@@ -5,9 +5,12 @@ export interface UploadedImage {
   clothingPart: ClothingPart;
   customClothingPart?: string;
   promptType: PromptType;
+  genderType?: GenderType;
+  guidance?: string;
   status: 'pending' | 'processing' | 'completed' | 'error';
   prompt?: string; // Original ChatGPT response
   midjourneyPrompts?: string[]; // Parsed Midjourney prompts
+  outfitNames?: string[]; // Parsed outfit naming suggestions
   error?: string;
   completedId?: number;
   generatedAt?: Date;
@@ -16,6 +19,8 @@ export interface UploadedImage {
 export type ClothingPart = 'top' | 'bottom' | 'shoes' | 'accessories' | 'dress' | 'outerwear' | 'hair' | 'features' | 'other';
 
 export type PromptType = 'outfit' | 'texture';
+
+export type GenderType = 'male' | 'female';
 
 export interface GeneratePromptRequest {
   imageId: string;
@@ -26,6 +31,7 @@ export interface GeneratePromptRequest {
 export interface GeneratePromptResponse {
   prompt: string;
   midjourneyPrompts: string[];
+  outfitNames?: string[];
 }
 
 export interface ProcessingJob {
@@ -40,6 +46,7 @@ export interface ProcessingResult {
   imageId: string;
   prompt: string;
   midjourneyPrompts: string[];
+  outfitNames?: string[];
   status: 'success' | 'error';
   error?: string;
 }

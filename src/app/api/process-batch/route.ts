@@ -8,6 +8,8 @@ interface BatchItem {
   clothingPart: string;
   customClothingPart?: string;
   promptType: 'outfit' | 'texture';
+  genderType?: 'male' | 'female';
+  guidance?: string;
   description: string;
   fileName?: string;
 }
@@ -19,13 +21,6 @@ export async function POST(request: NextRequest) {
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: 'No items provided for batch processing' },
-        { status: 400 }
-      );
-    }
-
-    if (items.length > 30) {
-      return NextResponse.json(
-        { error: 'Maximum 30 items allowed per batch' },
         { status: 400 }
       );
     }
@@ -78,7 +73,9 @@ export async function POST(request: NextRequest) {
           base64Data,
           clothingPartToUse,
           item.description || '',
-          item.promptType
+          item.promptType,
+          item.genderType,
+          item.guidance
         );
 
         const itemResult = {
