@@ -459,27 +459,34 @@ export default function Home() {
       {/* Header */}
       <header className="relative glass border-b border-gray-700/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <Wand2 className="h-8 w-8 text-indigo-400 animate-pulse-glow" />
-                <div className="absolute inset-0 h-8 w-8 text-indigo-400 animate-ping opacity-20"></div>
+          <div className="flex items-center justify-between h-16 md:h-20">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <div className="relative flex-shrink-0">
+                <Wand2 className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-400 animate-pulse-glow" />
+                <div className="absolute inset-0 h-6 w-6 sm:h-8 sm:w-8 text-indigo-400 animate-ping opacity-20"></div>
               </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-sm sm:text-lg md:text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent truncate">
                   3D Clothing Design Automation
                 </h1>
-                <div className="flex items-center space-x-3 text-xs text-gray-400 font-medium">
+                <div className="hidden sm:flex items-center space-x-2 md:space-x-3 text-xs text-gray-400 font-medium">
                   <span>Powered by AI</span>
                   <span>•</span>
                   <span>v{version}</span>
                   <span>•</span>
-                  <span>{buildTime}</span>
+                  <span className="hidden md:inline">{buildTime}</span>
+                </div>
+                {/* Mobile version info */}
+                <div className="sm:hidden text-xs text-gray-400 font-medium truncate">
+                  AI Powered • v{version}
                 </div>
               </div>
             </div>
-            <div className="text-sm text-indigo-300 font-medium px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20">
-              Pinterest → Midjourney
+            <div className="flex-shrink-0 ml-2 sm:ml-4">
+              <div className="text-xs sm:text-sm text-indigo-300 font-medium px-2 sm:px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+                <span className="hidden sm:inline">Pinterest → Midjourney</span>
+                <span className="sm:hidden">MJ</span>
+              </div>
             </div>
           </div>
         </div>
@@ -506,13 +513,13 @@ export default function Home() {
           {/* Completed Results Section */}
           {completedImages.length > 0 && (
             <div className="glass rounded-2xl border border-emerald-700/50 overflow-hidden">
-              <div className="p-6 border-b border-emerald-700/50 bg-emerald-500/5">
-                <div className="flex items-center justify-between">
+              <div className="p-4 sm:p-6 border-b border-emerald-700/50 bg-emerald-500/5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
                   <div>
-                    <h3 className="text-2xl font-bold text-emerald-300">
+                    <h3 className="text-lg sm:text-2xl font-bold text-emerald-300">
                       Completed Results
                     </h3>
-                    <p className="text-sm text-emerald-400/80 mt-1">
+                    <p className="text-xs sm:text-sm text-emerald-400/80 mt-1">
                       {
                         completedImages.filter(
                           (img) => img.status === "completed"
@@ -526,23 +533,25 @@ export default function Home() {
                       failed
                     </p>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
                     <button
                       onClick={() => setShowCompletedModal(true)}
-                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
+                      className="flex items-center space-x-2 px-3 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base"
                     >
-                      <List className="h-5 w-5" />
-                      <span>View All</span>
+                      <List className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="hidden sm:inline">View All</span>
+                      <span className="sm:hidden">All</span>
                     </button>
                     {completedImages.some(
                       (img) => img.status === "completed"
                     ) && (
                       <button
                         onClick={downloadAllResults}
-                        className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-500 hover:to-teal-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
+                        className="flex items-center space-x-2 px-3 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-500 hover:to-teal-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base"
                       >
-                        <Download className="h-5 w-5" />
-                        <span>Download All</span>
+                        <Download className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <span className="hidden sm:inline">Download All</span>
+                        <span className="sm:hidden">Download</span>
                       </button>
                     )}
                   </div>
@@ -560,25 +569,25 @@ export default function Home() {
                       key={`completed-${
                         image.processingId || image.completedId || image.id
                       }`}
-                      className="p-6 flex items-center space-x-6 hover:bg-gray-800/20 transition-colors"
+                      className="p-4 sm:p-6 flex items-center space-x-3 sm:space-x-6 hover:bg-gray-800/20 transition-colors"
                     >
                       {/* Image Thumbnail */}
-                      <div className="relative">
+                      <div className="relative flex-shrink-0">
                         <img
                           src={image.preview}
                           alt={image.file.name}
-                          className="w-20 h-20 object-cover rounded-xl border border-gray-700/50"
+                          className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-gray-700/50"
                         />
                         <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 to-transparent"></div>
                       </div>
 
                       {/* Image Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3 mb-1">
-                          <div className="text-lg font-medium text-white">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-1">
+                          <div className="text-sm sm:text-lg font-medium text-white">
                             #{image.completedId}
                           </div>
-                          <div className="text-sm text-gray-400">
+                          <div className="text-xs sm:text-sm text-gray-400">
                             {image.generatedAt
                               ? image.generatedAt.toLocaleDateString() +
                                 " " +
@@ -589,7 +598,7 @@ export default function Home() {
                               : ""}
                           </div>
                         </div>
-                        <div className="text-sm text-gray-300 truncate mb-2">
+                        <div className="text-xs sm:text-sm text-gray-300 truncate mb-2">
                           {image.file.name}
                         </div>
                         {image.genderType && (
@@ -598,8 +607,8 @@ export default function Home() {
                             {image.guidance && ` • "${image.guidance}"`}
                           </div>
                         )}
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className="text-sm text-gray-300">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className="text-xs sm:text-sm text-gray-300">
                             {image.clothingPart === "other" &&
                             image.customClothingPart
                               ? image.customClothingPart
@@ -616,22 +625,22 @@ export default function Home() {
                               ? "Outfit"
                               : "Texture"}
                           </span>
-                          <span className="text-sm text-gray-300">
+                          <span className="text-xs sm:text-sm text-gray-300">
                             {formatFileSize(image.file.size)}
                           </span>
                         </div>
                         {image.error && (
-                          <div className="text-sm text-red-400 bg-red-500/10 px-3 py-1 rounded-lg border border-red-500/20">
+                          <div className="text-xs sm:text-sm text-red-400 bg-red-500/10 px-3 py-1 rounded-lg border border-red-500/20">
                             {image.error}
                           </div>
                         )}
                       </div>
 
                       {/* Status Icon */}
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
                         {image.status === "completed" && (
-                          <div className="flex items-center space-x-3">
-                            <div className="h-6 w-6 text-emerald-400">
+                          <div className="flex items-center space-x-2 sm:space-x-3">
+                            <div className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400">
                               <svg
                                 className="w-full h-full"
                                 fill="currentColor"
@@ -646,15 +655,16 @@ export default function Home() {
                             </div>
                             <button
                               onClick={() => handleViewResults(image)}
-                              className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer"
+                              className="px-3 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-xs sm:text-sm"
                             >
-                              View Results
+                              <span className="hidden sm:inline">View Results</span>
+                              <span className="sm:hidden">View</span>
                             </button>
                           </div>
                         )}
                         {image.status === "error" && (
-                          <div className="flex items-center space-x-2">
-                            <div className="h-6 w-6 text-red-400">
+                          <div className="flex items-center space-x-1 sm:space-x-2">
+                            <div className="h-5 w-5 sm:h-6 sm:w-6 text-red-400">
                               <svg
                                 className="w-full h-full"
                                 fill="currentColor"
@@ -667,7 +677,7 @@ export default function Home() {
                                 />
                               </svg>
                             </div>
-                            <span className="text-sm text-red-400 font-medium">
+                            <span className="text-xs sm:text-sm text-red-400 font-medium hidden sm:inline">
                               Failed
                             </span>
                           </div>
