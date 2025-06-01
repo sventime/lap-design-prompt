@@ -1,0 +1,263 @@
+'use client';
+
+import React, { useCallback, useState } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Upload, X, Image as ImageIcon } from 'lucide-react';
+import { UploadedImage, ClothingPart, PromptType } from '@/types';
+
+interface FileUploadProps {
+  onFilesUpload: (files: UploadedImage[]) => void;
+  maxFiles?: number;
+  disabled?: boolean;
+}
+
+const CLOTHING_PARTS: { value: ClothingPart; label: string }[] = [
+  { value: 'top', label: 'Top' },
+  { value: 'bottom', label: 'Bottom' },
+  { value: 'dress', label: 'Dress' },
+  { value: 'outerwear', label: 'Outerwear' },
+  { value: 'shoes', label: 'Shoes' },
+  { value: 'accessories', label: 'Accessories' },
+  { value: 'hair', label: 'Hair' },
+  { value: 'features', label: 'Features' },
+  { value: 'other', label: 'Other (Custom)' },
+];
+
+const PROMPT_TYPES: { value: PromptType; label: string; description: string }[] = [
+  { value: 'texture', label: 'Texture', description: 'Material and texture focus' },
+  { value: 'outfit', label: 'Outfit', description: 'Complete outfit visualization' },
+];
+
+export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = false }: FileUploadProps) {
+  const [files, setFiles] = useState<UploadedImage[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (files.length + acceptedFiles.length > maxFiles) {
+      alert(`Maximum ${maxFiles} files allowed`);
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      acceptedFiles.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      
+      const newFiles: UploadedImage[] = data.files.map((file: any) => ({
+        id: file.id,
+        file: acceptedFiles.find(f => f.name === file.name)!,
+        preview: file.preview,
+        clothingPart: 'top' as ClothingPart,
+        promptType: 'texture' as PromptType,
+        status: 'pending' as const,
+      }));
+
+      const updatedFiles = [...files, ...newFiles];
+      setFiles(updatedFiles);
+      onFilesUpload(updatedFiles);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  }, [files, maxFiles, onFilesUpload]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+    },
+    multiple: true,
+    disabled: disabled || uploading,
+  });
+
+  const removeFile = (id: string) => {
+    const updatedFiles = files.filter(file => file.id !== id);
+    setFiles(updatedFiles);
+    onFilesUpload(updatedFiles);
+  };
+
+  const updateClothingPart = (id: string, clothingPart: ClothingPart) => {
+    const updatedFiles = files.map(file =>
+      file.id === id ? { ...file, clothingPart, customClothingPart: clothingPart === 'other' ? file.customClothingPart : undefined } : file
+    );
+    setFiles(updatedFiles);
+    onFilesUpload(updatedFiles);
+  };
+
+  const updateCustomClothingPart = (id: string, customClothingPart: string) => {
+    const updatedFiles = files.map(file =>
+      file.id === id ? { ...file, customClothingPart } : file
+    );
+    setFiles(updatedFiles);
+    onFilesUpload(updatedFiles);
+  };
+
+  const updatePromptType = (id: string, promptType: PromptType) => {
+    const updatedFiles = files.map(file =>
+      file.id === id ? { ...file, promptType } : file
+    );
+    setFiles(updatedFiles);
+    onFilesUpload(updatedFiles);
+  };
+
+  return (
+    <div className="w-full space-y-6">
+      {/* Drop Zone */}
+      <div
+        {...getRootProps()}
+        className={`
+          group border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 relative overflow-hidden
+          ${isDragActive ? 'border-indigo-400 bg-indigo-500/10 scale-105' : 'border-gray-600 hover:border-indigo-400'}
+          ${disabled || uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-500/5'}
+        `}
+      >
+        <input {...getInputProps()} />
+        
+        {/* Animated background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        
+        <div className="relative z-10">
+          <div className="relative mb-6">
+            <Upload className="mx-auto h-16 w-16 text-indigo-400 group-hover:scale-110 transition-transform duration-300" />
+            <div className="absolute inset-0 h-16 w-16 mx-auto text-indigo-400 animate-ping opacity-20 group-hover:opacity-40"></div>
+          </div>
+          
+          <div className="text-2xl font-bold text-white mb-3">
+            {isDragActive ? 'Drop your images here' : 'Upload Pinterest Images'}
+          </div>
+          <p className="text-gray-300 text-lg mb-2">
+            Drag and drop up to {maxFiles} images, or click to select files
+          </p>
+          <p className="text-sm text-gray-400">
+            Supports PNG, JPG, JPEG, WebP (max 10MB each)
+          </p>
+        </div>
+      </div>
+
+      {/* Upload Progress */}
+      {uploading && (
+        <div className="text-center py-6">
+          <div className="inline-flex items-center space-x-3 glass rounded-full px-6 py-3 border border-gray-700/50">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-400"></div>
+            <span className="text-indigo-300 font-medium">Uploading images...</span>
+          </div>
+        </div>
+      )}
+
+      {/* File List */}
+      {files.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-white">
+              Uploaded Images ({files.length}/{maxFiles})
+            </h3>
+            <button
+              onClick={() => {
+                setFiles([]);
+                onFilesUpload([]);
+              }}
+              className="text-sm text-red-400 hover:text-red-300 font-medium px-4 py-2 rounded-lg hover:bg-red-500/10 transition-colors"
+            >
+              Clear All
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {files.map((file) => (
+              <div key={file.id} className="group card-hover glass rounded-2xl border border-gray-700/50 overflow-hidden">
+                <div className="relative">
+                  <img
+                    src={file.preview}
+                    alt={file.file.name}
+                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  
+                  <button
+                    onClick={() => removeFile(file.id)}
+                    className="absolute top-3 right-3 bg-red-500/80 backdrop-blur-sm text-white rounded-full p-2 hover:bg-red-500 transition-all hover:scale-110"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  
+                  <div className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm border ${
+                    file.status === 'pending' ? 'bg-gray-800/80 text-gray-200 border-gray-600' :
+                    file.status === 'processing' ? 'bg-blue-800/80 text-blue-200 border-blue-600' :
+                    file.status === 'completed' ? 'bg-green-800/80 text-green-200 border-green-600' :
+                    'bg-red-800/80 text-red-200 border-red-600'
+                  }`}>
+                    {file.status}
+                  </div>
+                  
+                  <div className={`absolute top-3 right-12 px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm border ${
+                    file.promptType === 'outfit' 
+                      ? 'bg-blue-500/80 text-blue-100 border-blue-400' 
+                      : 'bg-purple-500/80 text-purple-100 border-purple-400'
+                  }`}>
+                    {file.promptType === 'outfit' ? 'Outfit' : 'Texture'}
+                  </div>
+                </div>
+                
+                <div className="p-4 space-y-3">
+                  <div className="text-sm font-medium text-white truncate">
+                    {file.file.name}
+                  </div>
+                  
+                  <select
+                    value={file.promptType}
+                    onChange={(e) => updatePromptType(file.id, e.target.value as PromptType)}
+                    className="w-full text-sm bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                  >
+                    {PROMPT_TYPES.map((type) => (
+                      <option key={type.value} value={type.value} className="bg-gray-800">
+                        {type.label} - {type.description}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  <select
+                    value={file.clothingPart}
+                    onChange={(e) => updateClothingPart(file.id, e.target.value as ClothingPart)}
+                    className="w-full text-sm bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                  >
+                    {CLOTHING_PARTS.map((part) => (
+                      <option key={part.value} value={part.value} className="bg-gray-800">
+                        {part.label}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {file.clothingPart === 'other' && (
+                    <input
+                      type="text"
+                      placeholder="Enter custom clothing part..."
+                      value={file.customClothingPart || ''}
+                      onChange={(e) => updateCustomClothingPart(file.id, e.target.value)}
+                      className="w-full text-sm bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

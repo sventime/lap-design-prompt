@@ -1,0 +1,46 @@
+export interface UploadedImage {
+  id: string;
+  file: File;
+  preview: string;
+  clothingPart: ClothingPart;
+  customClothingPart?: string;
+  promptType: PromptType;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  prompt?: string;
+  midjourneyPrompts?: string[];
+  error?: string;
+  completedId?: number;
+  generatedAt?: Date;
+}
+
+export type ClothingPart = 'top' | 'bottom' | 'shoes' | 'accessories' | 'dress' | 'outerwear' | 'hair' | 'features' | 'other';
+
+export type PromptType = 'outfit' | 'texture';
+
+export interface GeneratePromptRequest {
+  imageId: string;
+  clothingPart: ClothingPart;
+  description: string;
+}
+
+export interface GeneratePromptResponse {
+  prompt: string;
+  midjourneyPrompts: string[];
+}
+
+export interface ProcessingJob {
+  id: string;
+  images: UploadedImage[];
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  progress: number;
+  results: ProcessingResult[];
+}
+
+export interface ProcessingResult {
+  imageId: string;
+  prompt: string;
+  midjourneyPrompts: string[];
+  status: 'success' | 'error';
+  error?: string;
+}
+
