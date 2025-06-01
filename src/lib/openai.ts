@@ -50,9 +50,11 @@ Requirements:
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
+- DO NOT use markdown formatting (no **, -, or other markdown)
 - Format: "PROMPT1: [full prompt description] --ar 2:3 --q 2 --s 250"
 - Format: "PROMPT2: [full prompt description] --ar 2:3 --q 2 --s 250"
 - Format: "PROMPT3: [full prompt description] --ar 2:3 --q 2 --s 250"
+- Use plain text only, no bold or bullet points
 
 Also create 10 product names:
 Format: "NAME1: English Name | Russian Translation"
@@ -67,9 +69,11 @@ Requirements:
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
+- DO NOT use markdown formatting (no **, -, or other markdown)
 - Format: "PROMPT1: [full prompt description] --ar 1:1 --q 2"
 - Format: "PROMPT2: [full prompt description] --ar 1:1 --q 2"
 - Format: "PROMPT3: [full prompt description] --ar 1:1 --q 2"
+- Use plain text only, no bold or bullet points
 `
 }
 
@@ -108,20 +112,38 @@ Do not include /imagine command.`,
       throw new Error("No response from OpenAI");
     }
 
-    // Extract individual prompts from the response
+    // Extract individual prompts from the response with bulletproof parsing
     const prompts = content
       .split("\n")
-      .filter((line) => line.trim() && line.startsWith("PROMPT"))
-      .map((line) => line.replace(/^PROMPT\d+:\s*/, "").trim())
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => {
+        // Remove markdown formatting
+        line = line.replace(/^\*\*|\*\*$/g, ""); // Remove ** at start/end
+        line = line.replace(/^-\s*/, ""); // Remove bullet points
+        line = line.replace(/^\*\s*/, ""); // Remove asterisk bullets
+        return line.trim();
+      })
+      .filter((line) => line.match(/^PROMPT\s*\d+\s*:/i))
+      .map((line) => line.replace(/^PROMPT\s*\d+\s*:\s*/i, "").trim())
       .filter((prompt) => prompt.length > 0);
 
-    // Extract outfit names (only for outfit type)
+    // Extract outfit names (only for outfit type) with bulletproof parsing
     let outfitNames: string[] = [];
     if (promptType === "outfit") {
       outfitNames = content
         .split("\n")
-        .filter((line) => line.trim() && line.startsWith("NAME"))
-        .map((line) => line.replace(/^NAME\d+:\s*/, "").trim())
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => {
+          // Remove markdown formatting
+          line = line.replace(/^\*\*|\*\*$/g, ""); // Remove ** at start/end
+          line = line.replace(/^-\s*/, ""); // Remove bullet points
+          line = line.replace(/^\*\s*/, ""); // Remove asterisk bullets
+          return line.trim();
+        })
+        .filter((line) => line.match(/^NAME\s*\d+\s*:/i))
+        .map((line) => line.replace(/^NAME\s*\d+\s*:\s*/i, "").trim())
         .filter((name) => name.length > 0)
         .slice(0, 10);
     }
