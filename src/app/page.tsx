@@ -28,9 +28,16 @@ export default function Home() {
     processing: 0,
     status: "",
     currentItem: null as any,
+    midjourneyProgress: undefined as any,
   });
   const [sessionId, setSessionId] = useState("");
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const [serverUpdates, setServerUpdates] = useState<Array<{
+    timestamp: number;
+    type: string;
+    message: string;
+    details?: any;
+  }>>([]);
 
   // Setup SSE connection
   const setupSSEConnection = (sessionId: string) => {
@@ -45,6 +52,16 @@ export default function Home() {
       try {
         const data = JSON.parse(event.data);
         console.log("[SSE] Received message:", data);
+
+        // Add all server updates to the log (except pings)
+        if (data.type !== 'ping' && data.type !== 'connected') {
+          setServerUpdates(prev => [...prev, {
+            timestamp: data.timestamp || Date.now(),
+            type: data.type,
+            message: data.status || `${data.type.replace('_', ' ')} event`,
+            details: data.midjourneyProgress || data.currentItem
+          }]);
+        }
 
         switch (data.type) {
           case "connected":
@@ -62,11 +79,13 @@ export default function Home() {
             break;
 
           case "progress_update":
+          case "midjourney_progress":
             console.log("[SSE] Progress update:", {
               total: data.total,
               completed: data.completed,
               processing: data.processing,
               status: data.status,
+              midjourneyProgress: data.midjourneyProgress,
             });
             setProgressData({
               total: data.total,
@@ -74,6 +93,7 @@ export default function Home() {
               processing: data.processing,
               status: data.status,
               currentItem: data.currentItem,
+              midjourneyProgress: data.midjourneyProgress,
             });
             break;
 
@@ -92,6 +112,7 @@ export default function Home() {
               processing: data.processing,
               status: data.status,
               currentItem: null,
+              midjourneyProgress: undefined,
             });
 
             // Update individual image status
@@ -179,6 +200,7 @@ export default function Home() {
               processing: 0,
               status: data.status,
               currentItem: null,
+              midjourneyProgress: undefined,
             });
 
             // Mark processing as complete
@@ -262,7 +284,11 @@ export default function Home() {
       processing: 0,
       status: "Starting batch processing...",
       currentItem: null,
+      midjourneyProgress: undefined,
     });
+    
+    // Clear previous server updates
+    setServerUpdates([]);
 
     // Update all images to pending status initially
     const pendingImages = images.map((img) => ({
@@ -641,6 +667,7 @@ export default function Home() {
             isProcessing={isProcessing}
             onViewResults={handleViewResults}
             progressData={progressData}
+            serverUpdates={serverUpdates}
           />
         </div>
       </main>

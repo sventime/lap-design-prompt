@@ -14,10 +14,21 @@ interface ProcessingProgressProps {
     processing: number;
     status: string;
     currentItem: any;
+    midjourneyProgress?: {
+      promptIndex: number;
+      totalPrompts: number;
+      status: string;
+    };
   };
+  serverUpdates?: Array<{
+    timestamp: number;
+    type: string;
+    message: string;
+    details?: any;
+  }>;
 }
 
-export default function ProcessingProgress({ images, isProcessing, onViewResults, progressData }: ProcessingProgressProps) {
+export default function ProcessingProgress({ images, isProcessing, onViewResults, progressData, serverUpdates }: ProcessingProgressProps) {
   const activeImages = images; // images array now only contains pending/processing
   
   // Use real-time progress data if available, otherwise fallback to local calculation
@@ -56,31 +67,59 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
         
         {/* Current Item Being Processed */}
         <div className="mb-4 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-          <div className="flex items-center space-x-3">
-            {progressData?.currentItem ? (
-              <>
-                <Loader2 className="h-5 w-5 text-indigo-400 animate-spin" />
-                <div className="text-indigo-300">
-                  <span className="font-medium">Currently processing:</span>{' '}
-                  <span className="text-white font-semibold">{progressData.currentItem.fileName}</span>{' '}
-                  <span className="text-indigo-200">{progressData.currentItem.clothingPart}</span>
-                  <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium border ${
-                    progressData.currentItem.promptType === 'outfit' 
-                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' 
-                      : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                  }`}>
-                    {progressData.currentItem.promptType === 'outfit' ? 'Outfit' : 'Texture'}
-                  </span>
+          <div className="space-y-3">
+            <div className="flex items-center space-x-3">
+              {progressData?.currentItem ? (
+                <>
+                  <Loader2 className="h-5 w-5 text-indigo-400 animate-spin" />
+                  <div className="text-indigo-300">
+                    <span className="font-medium">Currently processing:</span>{' '}
+                    <span className="text-white font-semibold">{progressData.currentItem.fileName}</span>{' '}
+                    <span className="text-indigo-200">{progressData.currentItem.clothingPart}</span>
+                    <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium border ${
+                      progressData.currentItem.promptType === 'outfit' 
+                        ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' 
+                        : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                    }`}>
+                      {progressData.currentItem.promptType === 'outfit' ? 'Outfit' : 'Texture'}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="h-5 w-5 rounded-full bg-indigo-400/20 border border-indigo-400/30"></div>
+                  <div className="text-indigo-300">
+                    <span className="font-medium">Preparing batch processing...</span>
+                    <span className="text-indigo-200 ml-2">Please wait while we initialize</span>
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* Midjourney Progress */}
+            {progressData?.midjourneyProgress && (
+              <div className="ml-8 pl-4 border-l-2 border-indigo-500/30">
+                <div className="flex items-center space-x-3">
+                  <div className="h-3 w-3 rounded-full bg-indigo-400 animate-pulse"></div>
+                  <div className="text-sm text-indigo-200">
+                    <span className="font-medium">Midjourney:</span>{' '}
+                    <span className="text-white">
+                      Prompt {progressData.midjourneyProgress.promptIndex}/{progressData.midjourneyProgress.totalPrompts}
+                    </span>{' '}
+                    <span className="text-indigo-300">• {progressData.midjourneyProgress.status}</span>
+                  </div>
                 </div>
-              </>
-            ) : (
-              <>
-                <div className="h-5 w-5 rounded-full bg-indigo-400/20 border border-indigo-400/30"></div>
-                <div className="text-indigo-300">
-                  <span className="font-medium">Preparing batch processing...</span>
-                  <span className="text-indigo-200 ml-2">Please wait while we initialize</span>
+                
+                {/* Midjourney Progress Bar */}
+                <div className="mt-2 w-full bg-gray-700/30 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-indigo-400 to-purple-400 rounded-full transition-all duration-500"
+                    style={{ 
+                      width: `${(progressData.midjourneyProgress.promptIndex / progressData.midjourneyProgress.totalPrompts) * 100}%`
+                    }}
+                  ></div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -213,6 +252,64 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
       </div>
       )}
 
+
+      {/* Server Updates Log */}
+      {(serverUpdates && serverUpdates.length > 0) && (
+        <div className="glass rounded-2xl border border-gray-700/50 overflow-hidden">
+          <div className="p-6 border-b border-gray-700/50">
+            <h4 className="text-xl font-semibold text-white">Server Updates</h4>
+            <p className="text-sm text-gray-400 mt-1">Real-time processing status from server</p>
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            <div className="divide-y divide-gray-700/30">
+              {serverUpdates.slice(-10).reverse().map((update, index) => {
+                const isRecent = Date.now() - update.timestamp < 5000; // Highlight updates from last 5 seconds
+                const typeColors = {
+                  'batch_started': 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+                  'progress_update': 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+                  'midjourney_progress': 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+                  'item_completed': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+                  'item_failed': 'text-red-400 bg-red-500/10 border-red-500/20',
+                  'batch_completed': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+                  'default': 'text-gray-400 bg-gray-500/10 border-gray-500/20'
+                };
+                
+                const colorClass = typeColors[update.type as keyof typeof typeColors] || typeColors.default;
+                
+                return (
+                  <div 
+                    key={`${update.timestamp}-${index}`} 
+                    className={`p-4 hover:bg-gray-800/20 transition-all ${isRecent ? 'bg-indigo-500/5 border-l-2 border-indigo-400' : ''}`}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium border ${colorClass} mt-0.5`}>
+                        {update.type.replace('_', ' ').toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white font-medium mb-1">
+                          {update.message}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {new Date(update.timestamp).toLocaleTimeString()}
+                          {update.details && (
+                            <span className="ml-2 text-gray-500">
+                              • {JSON.stringify(update.details).slice(0, 100)}
+                              {JSON.stringify(update.details).length > 100 ? '...' : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {isRecent && (
+                        <div className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse"></div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Processing Status */}
       {isProcessing && (

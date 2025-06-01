@@ -77,7 +77,30 @@ export async function POST(request: NextRequest) {
           item.promptType,
           item.genderType,
           item.guidance,
-          true // autoSendToMidjourney - will use base64Data directly for Discord attachment
+          true, // autoSendToMidjourney - will use base64Data directly for Discord attachment
+          // Midjourney progress callback
+          (promptIndex: number, total: number, status: string) => {
+            if (sessionId) {
+              sendProgressUpdate(sessionId, {
+                type: 'midjourney_progress',
+                total: items.length,
+                completed: i,
+                processing: 1,
+                currentItem: {
+                  id: item.id,
+                  fileName: item.fileName || `Image ${i + 1}`,
+                  clothingPart: clothingPartToUse,
+                  promptType: item.promptType
+                },
+                midjourneyProgress: {
+                  promptIndex,
+                  totalPrompts: total,
+                  status
+                },
+                status: `Processing image ${i + 1}/${items.length}: ${status}`
+              });
+            }
+          }
         );
 
         const itemResult = {

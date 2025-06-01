@@ -95,7 +95,11 @@ async function uploadImageToDiscord(imageBase64: string): Promise<string> {
   }
 }
 
-export async function sendPromptToMidjourney(prompt: string, imageBase64?: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+export async function sendPromptToMidjourney(
+  prompt: string, 
+  imageBase64?: string, 
+  onProgress?: (status: string) => void
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     console.log(`[Midjourney] Starting connection to Midjourney...`);
     console.log(`[Midjourney] Server ID: ${serverId || "DM mode"}`);
@@ -128,6 +132,7 @@ export async function sendPromptToMidjourney(prompt: string, imageBase64?: strin
     // Upload image to Discord first if provided
     if (imageBase64) {
       try {
+        onProgress?.("Uploading reference image to Discord...");
         console.log(`[Midjourney] Uploading image to Discord first...`);
         const discordImageUrl = await uploadImageToDiscord(imageBase64);
         finalPrompt = `${discordImageUrl} ${prompt}`;
@@ -137,6 +142,7 @@ export async function sendPromptToMidjourney(prompt: string, imageBase64?: strin
       }
     }
     
+    onProgress?.("Sending prompt to Midjourney...");
     console.log(`[Midjourney] Sending prompt: ${finalPrompt}`);
     const message = await midjourneyClient.Imagine(finalPrompt);
     
@@ -179,7 +185,11 @@ export async function sendPromptToMidjourney(prompt: string, imageBase64?: strin
   }
 }
 
-export async function sendMultiplePromptsToMidjourney(prompts: string[], imageBase64?: string): Promise<{
+export async function sendMultiplePromptsToMidjourney(
+  prompts: string[], 
+  imageBase64?: string, 
+  onProgress?: (promptIndex: number, total: number, status: string) => void
+): Promise<{
   success: boolean;
   results: Array<{ prompt: string; messageId?: string; error?: string }>;
 }> {
@@ -192,6 +202,7 @@ export async function sendMultiplePromptsToMidjourney(prompts: string[], imageBa
     let discordImageUrl: string | null = null;
     if (imageBase64) {
       try {
+        onProgress?.(0, prompts.length, "Uploading reference image to Discord...");
         console.log(`[Midjourney] Uploading image to Discord for batch processing...`);
         discordImageUrl = await uploadImageToDiscord(imageBase64);
         console.log(`[Midjourney] Image uploaded for batch: ${discordImageUrl}`);
@@ -200,9 +211,11 @@ export async function sendMultiplePromptsToMidjourney(prompts: string[], imageBa
       }
     }
     
-    for (const prompt of prompts) {
+    for (let i = 0; i < prompts.length; i++) {
+      const prompt = prompts[i];
       try {
-        console.log(`[Midjourney] Sending prompt: ${prompt}`);
+        onProgress?.(i + 1, prompts.length, `Processing prompt ${i + 1}/${prompts.length}...`);
+        console.log(`[Midjourney] Sending prompt ${i + 1}/${prompts.length}: ${prompt}`);
         console.log(`[Midjourney] Discord image URL available: ${!!discordImageUrl}`);
         
         let finalPrompt = prompt;
@@ -218,19 +231,25 @@ export async function sendMultiplePromptsToMidjourney(prompts: string[], imageBa
             prompt,
             messageId: message.id,
           });
-          console.log(`[Midjourney] Prompt sent successfully. Message ID: ${message.id}`);
+          onProgress?.(i + 1, prompts.length, `Prompt ${i + 1}/${prompts.length} sent successfully`);
+          console.log(`[Midjourney] Prompt ${i + 1}/${prompts.length} sent successfully. Message ID: ${message.id}`);
         } else {
           results.push({
             prompt,
             error: "Failed to send prompt",
           });
+          onProgress?.(i + 1, prompts.length, `Prompt ${i + 1}/${prompts.length} failed`);
         }
         
         // Add delay between requests to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (i < prompts.length - 1) {
+          onProgress?.(i + 1, prompts.length, `Waiting before next prompt... (${i + 2}/${prompts.length})`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
         
       } catch (error) {
         console.error(`[Midjourney] Error sending prompt "${prompt}":`, error);
+        onProgress?.(i + 1, prompts.length, `Prompt ${i + 1}/${prompts.length} failed with error`);
         results.push({
           prompt,
           error: error instanceof Error ? error.message : "Unknown error occurred",

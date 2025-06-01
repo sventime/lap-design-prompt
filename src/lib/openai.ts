@@ -15,7 +15,8 @@ export async function generateMidjourneyPrompt(
   promptType: "outfit" | "texture" = "outfit",
   genderType: "male" | "female" = "female",
   guidance?: string,
-  autoSendToMidjourney: boolean = true
+  autoSendToMidjourney: boolean = true,
+  onMidjourneyProgress?: (promptIndex: number, total: number, status: string) => void
 ): Promise<{
   prompt: string;
   midjourneyPrompts: string[];
@@ -61,19 +62,28 @@ Format: "NAME1: English Name | Russian Translation"
 Example: "NAME1: Navy Blue Jeans | Темно-синие джинсы"
 - Always end with clothing item name
 - Include descriptive details`
-    : `Create 3 macro texture prompts for ${clothingPart} fabric.
+    : `Create 3 fabric texture prompts for ${clothingPart} material.
 Requirements:
-- Extreme close-up of fabric only
-- Fill entire frame with texture
+- Focus on fabric texture, weave pattern, and material properties
+- Specify fabric type (cotton, silk, wool, denim, leather, etc.)
+- Include technical fabric details (thread count, weave type, finish)
+- Mention fabric behavior (drape, stretch, stiffness)
+- Use macro photography perspective
+- Add lighting that shows texture depth
 - Use --ar 1:1 --q 2
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
 - DO NOT use markdown formatting (no **, -, or other markdown)
-- Format: "PROMPT1: [full prompt description] --ar 1:1 --q 2"
-- Format: "PROMPT2: [full prompt description] --ar 1:1 --q 2"
-- Format: "PROMPT3: [full prompt description] --ar 1:1 --q 2"
+- Format: "PROMPT1: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2"
+- Format: "PROMPT2: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2"
+- Format: "PROMPT3: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2"
 - Use plain text only, no bold or bullet points
+
+Examples of good fabric texture prompts:
+- "Cotton denim fabric texture, diagonal twill weave, indigo blue threads, raw selvedge edge, macro photography --ar 1:1 --q 2"
+- "Wool herringbone fabric texture, chevron weave pattern, charcoal gray fibers, soft hand feel, macro photography --ar 1:1 --q 2"
+- "Silk charmeuse fabric texture, satin weave, lustrous surface, fluid drape, ivory color, macro photography --ar 1:1 --q 2"
 `
 }
 
@@ -167,7 +177,8 @@ Do not include /imagine command.`,
         );
         const midjourneyResult = await sendMultiplePromptsToMidjourney(
           result.midjourneyPrompts,
-          imageBase64
+          imageBase64,
+          onMidjourneyProgress
         );
 
         console.log("[OpenAI] Midjourney results:", midjourneyResult);
