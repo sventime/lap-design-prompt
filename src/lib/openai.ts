@@ -158,11 +158,16 @@ Do not include /imagine command.`,
     if (result.midjourneyPrompts.length > 0) {
       try {
         console.log("[OpenAI] Auto-sending all prompts to Midjourney...");
-        console.log(`[OpenAI] Sending ${result.midjourneyPrompts.length} prompts`);
+        console.log(
+          `[OpenAI] Sending ${result.midjourneyPrompts.length} prompts`
+        );
 
-        const { sendMultiplePromptsToMidjourney } = await import("./midjourney");
+        const { sendMultiplePromptsToMidjourney } = await import(
+          "./midjourney"
+        );
         const midjourneyResult = await sendMultiplePromptsToMidjourney(
-          result.midjourneyPrompts
+          result.midjourneyPrompts,
+          imageBase64
         );
 
         console.log("[OpenAI] Midjourney results:", midjourneyResult);
@@ -183,7 +188,7 @@ Do not include /imagine command.`,
         // Return the prompts even if Midjourney sending fails
         return {
           ...result,
-          midjourneyResults: result.midjourneyPrompts.map(prompt => ({
+          midjourneyResults: result.midjourneyPrompts.map((prompt) => ({
             prompt,
             error:
               midjourneyError instanceof Error

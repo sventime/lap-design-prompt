@@ -12,6 +12,7 @@ interface BatchItem {
   guidance?: string;
   description: string;
   fileName?: string;
+  preview?: string; // Image URL for Midjourney
 }
 
 export async function POST(request: NextRequest) {
@@ -75,7 +76,8 @@ export async function POST(request: NextRequest) {
           item.description || '',
           item.promptType,
           item.genderType,
-          item.guidance
+          item.guidance,
+          true // autoSendToMidjourney - will use base64Data directly for Discord attachment
         );
 
         const itemResult = {

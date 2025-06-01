@@ -24,7 +24,78 @@ export const midjourneyClient = new Midjourney({
   HuggingFaceToken: undefined, // Explicitly set to undefined
 });
 
-export async function sendPromptToMidjourney(prompt: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+async function uploadImageToDiscord(imageBase64: string): Promise<string> {
+  try {
+    console.log(`[Discord] Uploading image to Discord using REST API...`);
+    
+    // Create FormData with the image
+    const imageBuffer = Buffer.from(imageBase64, 'base64');
+    const formData = new FormData();
+    
+    // Create a File-like object from buffer
+    const imageFile = new File([imageBuffer], 'reference.jpg', { type: 'image/jpeg' });
+    formData.append('files[0]', imageFile);
+    formData.append('payload_json', JSON.stringify({
+      content: "Reference image for Midjourney"
+    }));
+    
+    // Send to Discord REST API
+    const response = await fetch(
+      `https://discord.com/api/v10/channels/${process.env.DISCORD_CHANNEL_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': process.env.DISCORD_TOKEN,
+        },
+        body: formData
+      }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Discord API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    const messageData = await response.json();
+    
+    if (!messageData.attachments || messageData.attachments.length === 0) {
+      throw new Error("No attachments found in Discord message response");
+    }
+    
+    const discordImageUrl = messageData.attachments[0].url;
+    console.log(`[Discord] Image uploaded successfully: ${discordImageUrl}`);
+    
+    // Optionally delete the message after getting the URL
+    setTimeout(async () => {
+      try {
+        const deleteResponse = await fetch(
+          `https://discord.com/api/v10/channels/${process.env.DISCORD_CHANNEL_ID}/messages/${messageData.id}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Authorization': process.env.DISCORD_TOKEN,
+            }
+          }
+        );
+        
+        if (deleteResponse.ok) {
+          console.log(`[Discord] Cleanup: Deleted temporary message`);
+        } else {
+          console.warn(`[Discord] Could not delete temporary message: ${deleteResponse.status}`);
+        }
+      } catch (deleteError) {
+        console.warn(`[Discord] Could not delete temporary message:`, deleteError);
+      }
+    }, 5000); // Delete after 5 seconds
+    
+    return discordImageUrl;
+  } catch (error) {
+    console.error("[Discord] Error uploading image:", error);
+    throw error;
+  }
+}
+
+export async function sendPromptToMidjourney(prompt: string, imageBase64?: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     console.log(`[Midjourney] Starting connection to Midjourney...`);
     console.log(`[Midjourney] Server ID: ${serverId || "DM mode"}`);
@@ -50,7 +121,24 @@ export async function sendPromptToMidjourney(prompt: string): Promise<{ success:
     console.log(`[Midjourney] Successfully connected to Discord`);
     
     console.log(`[Midjourney] Sending Imagine command...`);
-    const message = await midjourneyClient.Imagine(prompt);
+    console.log(`[Midjourney] Image base64 provided: ${!!imageBase64}`);
+    
+    let finalPrompt = prompt;
+    
+    // Upload image to Discord first if provided
+    if (imageBase64) {
+      try {
+        console.log(`[Midjourney] Uploading image to Discord first...`);
+        const discordImageUrl = await uploadImageToDiscord(imageBase64);
+        finalPrompt = `${discordImageUrl} ${prompt}`;
+        console.log(`[Midjourney] Final prompt with Discord image: ${finalPrompt}`);
+      } catch (uploadError) {
+        console.warn(`[Midjourney] Failed to upload image to Discord, proceeding without image:`, uploadError);
+      }
+    }
+    
+    console.log(`[Midjourney] Sending prompt: ${finalPrompt}`);
+    const message = await midjourneyClient.Imagine(finalPrompt);
     
     if (!message) {
       console.error(`[Midjourney] No message returned from Imagine command`);
@@ -91,7 +179,7 @@ export async function sendPromptToMidjourney(prompt: string): Promise<{ success:
   }
 }
 
-export async function sendMultiplePromptsToMidjourney(prompts: string[]): Promise<{
+export async function sendMultiplePromptsToMidjourney(prompts: string[], imageBase64?: string): Promise<{
   success: boolean;
   results: Array<{ prompt: string; messageId?: string; error?: string }>;
 }> {
@@ -100,11 +188,30 @@ export async function sendMultiplePromptsToMidjourney(prompts: string[]): Promis
     
     const results = [];
     
+    // Upload image to Discord once for all prompts if provided
+    let discordImageUrl: string | null = null;
+    if (imageBase64) {
+      try {
+        console.log(`[Midjourney] Uploading image to Discord for batch processing...`);
+        discordImageUrl = await uploadImageToDiscord(imageBase64);
+        console.log(`[Midjourney] Image uploaded for batch: ${discordImageUrl}`);
+      } catch (uploadError) {
+        console.warn(`[Midjourney] Failed to upload image to Discord for batch, proceeding without image:`, uploadError);
+      }
+    }
+    
     for (const prompt of prompts) {
       try {
         console.log(`[Midjourney] Sending prompt: ${prompt}`);
+        console.log(`[Midjourney] Discord image URL available: ${!!discordImageUrl}`);
         
-        const message = await midjourneyClient.Imagine(prompt);
+        let finalPrompt = prompt;
+        if (discordImageUrl) {
+          finalPrompt = `${discordImageUrl} ${prompt}`;
+          console.log(`[Midjourney] Final prompt with Discord image: ${finalPrompt}`);
+        }
+        
+        const message = await midjourneyClient.Imagine(finalPrompt);
         
         if (message) {
           results.push({
