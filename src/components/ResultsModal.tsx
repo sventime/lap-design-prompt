@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { X, Download, MessageSquare, Copy, Check } from 'lucide-react';
 import { UploadedImage, formatFileSize } from '@/types';
 import PromptCard from './PromptCard';
+import { useScrollLock } from '@/hooks/useScrollLock';
 
 interface ResultsModalProps {
   image: UploadedImage | null;
@@ -15,6 +16,9 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'prompts' | 'chatgpt'>('prompts');
   const [chatGPTResponseCopied, setChatGPTResponseCopied] = useState(false);
+
+  // Lock body scroll when modal is open
+  useScrollLock(isOpen);
 
   if (!isOpen || !image) return null;
 
@@ -68,8 +72,9 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-60">
-      <div className="glass border border-gray-700/50 rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-60 overflow-y-auto">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="glass border border-gray-700/50 rounded-2xl shadow-2xl max-w-6xl w-full my-8 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-8 border-b border-gray-700/50">
           <div>
@@ -98,7 +103,7 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
         </div>
 
         {/* Content */}
-        <div className="flex h-[calc(90vh-120px)]">
+        <div className="flex min-h-[600px]">
           {/* Image Preview */}
           <div className="w-1/3 p-8 border-r border-gray-700/50 bg-gray-800/20">
             <div className="relative">
@@ -125,7 +130,7 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
           </div>
 
           {/* Tabs and Content */}
-          <div className="flex-1 p-8 overflow-y-auto">
+          <div className="flex-1 p-8">
             <div className="space-y-6">
               {/* Tab Navigation */}
               <div className="flex items-center space-x-1 bg-gray-800/50 border border-gray-700/50 rounded-xl p-1">
@@ -228,8 +233,8 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
             </div>
           </div>
         </div>
+        </div>
       </div>
-
     </div>
   );
 }

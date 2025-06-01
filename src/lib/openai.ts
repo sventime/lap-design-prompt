@@ -46,15 +46,22 @@ OUTFIT EXAMPLE:
 "runway fashion look, vintage graphic ringer t-shirt with distressed cotton fabric, oversized fit, neutral beige color, styled with high-waisted denim jeans, minimalist aesthetic, studio lighting, professional fashion photography --ar 2:3 --q 2 --s 250"
 `
     : `
-TEXTURE PROMPTS - Generate detailed material and texture studies:
-1. Generate exactly 3 different variations focusing specifically on material properties
-2. Focus ONLY on the ${clothingPart} material, texture, and fabric details
-3. Include close-up views, fabric weave patterns, material properties
-4. Emphasize surface details, texture mapping, and material characteristics
-5. Perfect for 3D texture mapping and material design
+TEXTURE PROMPTS - Generate extreme close-up material texture studies:
+1. Generate exactly 3 different variations focusing EXCLUSIVELY on material surface texture
+2. EXTREME CLOSE-UP macro photography ONLY of the ${clothingPart} fabric/material
+3. FILL THE ENTIRE FRAME with texture - no background, no context, no space around fabric
+4. Focus on weave patterns, fiber details, surface irregularities, material grain
+5. Perfect for seamless 3D texture mapping and material design workflows
+6. MANDATORY: Always use --ar 1:1 for square format that tiles perfectly
+
+CRITICAL TEXTURE REQUIREMENTS:
+- ZOOMED IN so close that fabric fibers are visible
+- NO negative space, NO background visible
+- COVERS the complete square frame edge-to-edge
+- Shows raw material properties for 3D rendering
 
 TEXTURE EXAMPLE:
-"extreme close-up macro photography of vintage denim fabric texture, detailed cotton weave pattern, indigo blue color with subtle fading, raw selvedge edge detail, high resolution textile surface for 3D mapping --ar 1:1 --q 2 --s 50 --chaos 10"
+"extreme macro close-up photography of cotton denim fabric texture, individual fiber threads visible, indigo blue weave pattern filling entire frame, no background visible, raw textile surface detail for seamless 3D mapping, ultra-detailed fabric grain --ar 1:1 --q 2 --s 25"
 `
 }
 
@@ -87,10 +94,12 @@ OUTFIT PROMPT Requirements:
 `
     : `
 TEXTURE PROMPT Requirements:
-- Focus ONLY on the material and texture properties of the ${clothingPart}
-- Create 3 unique close-up material studies showing different fabric details
-- Include weave patterns, surface texture, material characteristics
-- Perfect for 3D texture mapping and material design workflows
+- EXTREME CLOSE-UP macro photography ONLY of ${clothingPart} fabric surface
+- FILL ENTIRE SQUARE FRAME edge-to-edge with texture (NO background visible)
+- Create 3 unique ultra-zoomed material studies showing fiber-level detail
+- Show weave patterns, thread structure, surface irregularities at microscopic level
+- MANDATORY: Use --ar 1:1 for perfect square format that tiles seamlessly
+- Perfect for high-resolution 3D texture mapping and PBR material workflows
 `
 }
 

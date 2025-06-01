@@ -62,7 +62,7 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
         file: acceptedFiles.find(f => f.name === file.name)!,
         preview: file.preview,
         clothingPart: 'top' as ClothingPart,
-        promptType: 'texture' as PromptType,
+        promptType: 'outfit' as PromptType,
         status: 'pending' as const,
       }));
 
@@ -224,16 +224,6 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
                     <div className="text-xs text-gray-400 font-medium">Prompt Type</div>
                     <div className="relative bg-gray-800 border border-gray-600 rounded-lg p-1 flex">
                       <button
-                        onClick={() => updatePromptType(file.id, 'texture')}
-                        className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
-                          file.promptType === 'texture'
-                            ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-lg'
-                            : 'text-gray-400 hover:text-gray-300'
-                        }`}
-                      >
-                        Texture
-                      </button>
-                      <button
                         onClick={() => updatePromptType(file.id, 'outfit')}
                         className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
                           file.promptType === 'outfit'
@@ -242,6 +232,16 @@ export default function FileUpload({ onFilesUpload, maxFiles = 30, disabled = fa
                         }`}
                       >
                         Outfit
+                      </button>
+                      <button
+                        onClick={() => updatePromptType(file.id, 'texture')}
+                        className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
+                          file.promptType === 'texture'
+                            ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-lg'
+                            : 'text-gray-400 hover:text-gray-300'
+                        }`}
+                      >
+                        Texture
                       </button>
                     </div>
                     <div className="text-xs text-gray-500">

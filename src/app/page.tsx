@@ -106,6 +106,13 @@ export default function Home() {
                     // Check if this image is already in completed list
                     if (!prev.some(img => img.id === completedImage.id)) {
                       setCompletedIdCounter(prevCounter => prevCounter + 1);
+                      
+                      // Smooth scroll to top when image completes
+                      window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                      });
+                      
                       return [...prev, {
                         ...completedImage,
                         completedId: completedIdCounter,

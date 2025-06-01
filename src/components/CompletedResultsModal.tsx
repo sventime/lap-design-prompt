@@ -3,6 +3,7 @@
 import React from 'react';
 import { X, Download, ExternalLink } from 'lucide-react';
 import { UploadedImage, formatFileSize } from '@/types';
+import { useScrollLock } from '@/hooks/useScrollLock';
 
 interface CompletedResultsModalProps {
   isOpen: boolean;
@@ -19,6 +20,9 @@ export default function CompletedResultsModal({
   onViewResults, 
   onDownloadAll 
 }: CompletedResultsModalProps) {
+  // Lock body scroll when modal is open
+  useScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   const sortedImages = completedImages.sort((a, b) => {
@@ -28,8 +32,9 @@ export default function CompletedResultsModal({
   });
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
-      <div className="glass border border-emerald-700/50 rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto animate-in fade-in duration-300">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="glass border border-emerald-700/50 rounded-2xl shadow-2xl w-full max-w-6xl my-8 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-emerald-700/50 bg-emerald-500/5">
           <div>
@@ -58,7 +63,7 @@ export default function CompletedResultsModal({
         </div>
 
         {/* Content */}
-        <div className="h-[calc(90vh-120px)] overflow-y-auto">
+        <div className="max-h-[70vh] overflow-y-auto">
           {sortedImages.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-400">
               <div className="text-center">
@@ -158,6 +163,7 @@ export default function CompletedResultsModal({
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
