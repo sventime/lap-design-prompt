@@ -26,9 +26,10 @@ interface ProcessingProgressProps {
     message: string;
     details?: any;
   }>;
+  isStopping?: boolean;
 }
 
-export default function ProcessingProgress({ images, isProcessing, onViewResults, progressData, serverUpdates }: ProcessingProgressProps) {
+export default function ProcessingProgress({ images, isProcessing, onViewResults, progressData, serverUpdates, isStopping }: ProcessingProgressProps) {
   const activeImages = images; // images array now only contains pending/processing
   
   // Use real-time progress data if available, otherwise fallback to local calculation
@@ -37,8 +38,23 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
   const processingImages = progressData?.processing || images.filter(img => img.status === 'processing').length;
   const pendingImages = totalActiveImages - completedImages - processingImages;
 
-  // Progress calculation using real-time data
-  const progress = totalActiveImages > 0 ? (completedImages / totalActiveImages) * 100 : 0;
+  // Enhanced progress calculation including Midjourney prompt progress
+  const calculateDetailedProgress = () => {
+    if (totalActiveImages === 0) return 0;
+    
+    let totalProgress = completedImages; // Each completed image = 1 full unit
+    
+    // Add partial progress for currently processing image
+    if (progressData?.midjourneyProgress && processingImages > 0) {
+      const { promptIndex, totalPrompts } = progressData.midjourneyProgress;
+      const currentImageProgress = promptIndex / totalPrompts;
+      totalProgress += currentImageProgress;
+    }
+    
+    return Math.min((totalProgress / totalActiveImages) * 100, 100);
+  };
+
+  const progress = calculateDetailedProgress();
   
   // Debug logging
   console.log('Progress Debug:', {
@@ -46,7 +62,8 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
     completedImages,
     processingImages,
     pendingImages,
-    progress: `${progress}%`,
+    progress: `${progress.toFixed(1)}%`,
+    midjourneyProgress: progressData?.midjourneyProgress,
     isProcessing,
     progressData
   });
@@ -55,7 +72,7 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
   if (!isProcessing && totalActiveImages === 0 && !progressData?.total) return null;
 
   return (
-    <div className="w-full space-y-8">
+    <div className={`w-full space-y-8 transition-opacity duration-500 ${isStopping ? 'opacity-60' : 'opacity-100'}`}>
       {/* Overall Progress */}
       <div className="glass rounded-2xl border border-gray-700/50 p-8">
         <div className="flex items-center justify-between mb-6">
@@ -98,22 +115,35 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
             
             {/* Midjourney Progress */}
             {progressData?.midjourneyProgress && (
-              <div className="ml-8 pl-4 border-l-2 border-indigo-500/30">
+              <div className={`ml-8 pl-4 border-l-2 transition-all duration-500 ${
+                isStopping ? 'border-orange-500/50' : 'border-indigo-500/30'
+              }`}>
                 <div className="flex items-center space-x-3">
-                  <div className="h-3 w-3 rounded-full bg-indigo-400 animate-pulse"></div>
+                  <div className={`h-3 w-3 rounded-full transition-colors duration-500 ${
+                    isStopping ? 'bg-orange-400 animate-pulse' : 'bg-indigo-400 animate-pulse'
+                  }`}></div>
                   <div className="text-sm text-indigo-200">
                     <span className="font-medium">Midjourney:</span>{' '}
                     <span className="text-white">
                       Prompt {progressData.midjourneyProgress.promptIndex}/{progressData.midjourneyProgress.totalPrompts}
                     </span>{' '}
-                    <span className="text-indigo-300">• {progressData.midjourneyProgress.status}</span>
+                    <span className={`transition-colors duration-500 ${
+                      isStopping ? 'text-orange-300' : 'text-indigo-300'
+                    }`}>• {progressData.midjourneyProgress.status}</span>
+                    {isStopping && (
+                      <span className="text-orange-400 ml-2 font-medium">(Stopping after completion)</span>
+                    )}
                   </div>
                 </div>
                 
                 {/* Midjourney Progress Bar */}
                 <div className="mt-2 w-full bg-gray-700/30 rounded-full h-2 overflow-hidden">
                   <div 
-                    className="h-full bg-gradient-to-r from-indigo-400 to-purple-400 rounded-full transition-all duration-500"
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      isStopping 
+                        ? 'bg-gradient-to-r from-orange-400 to-red-400' 
+                        : 'bg-gradient-to-r from-indigo-400 to-purple-400'
+                    }`}
                     style={{ 
                       width: `${(progressData.midjourneyProgress.promptIndex / progressData.midjourneyProgress.totalPrompts) * 100}%`
                     }}
@@ -271,6 +301,9 @@ export default function ProcessingProgress({ images, isProcessing, onViewResults
                   'item_completed': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
                   'item_failed': 'text-red-400 bg-red-500/10 border-red-500/20',
                   'batch_completed': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+                  'processing_stopping': 'text-orange-400 bg-orange-500/10 border-orange-500/20',
+                  'processing_stopped': 'text-red-400 bg-red-500/10 border-red-500/20',
+                  'batch_aborted': 'text-red-400 bg-red-500/10 border-red-500/20',
                   'default': 'text-gray-400 bg-gray-500/10 border-gray-500/20'
                 };
                 

@@ -16,6 +16,7 @@ export default function Home() {
   const [completedIdCounter, setCompletedIdCounter] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingAborted, setProcessingAborted] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [selectedImage, setSelectedImage] = useState<UploadedImage | null>(
     null
   );
@@ -208,8 +209,9 @@ export default function Home() {
             // Mark processing as complete
             setIsProcessing(false);
             
-            // Reset abort flag
+            // Reset abort and stopping flags
             setProcessingAborted(false);
+            setIsStopping(false);
 
             // Clean up SSE connection after a brief delay
             setTimeout(() => {
@@ -262,8 +264,8 @@ export default function Home() {
   // Stop processing function
   const handleStopProcessing = () => {
     console.log("[STOP] User requested to stop processing");
+    setIsStopping(true);
     setProcessingAborted(true);
-    setIsProcessing(false);
     
     // Send abort signal to server
     if (sessionId) {
@@ -274,24 +276,21 @@ export default function Home() {
       }).catch(err => console.warn('[STOP] Failed to notify server:', err));
     }
     
-    // Cleanup SSE connection
-    cleanupSSEConnection();
-    
-    // Reset progress
-    setProgressData({
-      total: 0,
-      completed: 0,
-      processing: 0,
-      status: "Processing stopped by user",
-      currentItem: null,
-      midjourneyProgress: undefined,
-    });
+    // Update progress to show stopping status
+    setProgressData(prev => ({
+      ...prev,
+      status: "Stopping processing... Waiting for current Discord image generation to complete",
+      midjourneyProgress: prev.midjourneyProgress ? {
+        ...prev.midjourneyProgress,
+        status: "Stopping after current prompt completes..."
+      } : undefined
+    }));
     
     // Add stop message to server updates
     setServerUpdates(prev => [...prev, {
       timestamp: Date.now(),
-      type: 'processing_stopped',
-      message: 'Processing stopped by user request',
+      type: 'processing_stopping',
+      message: 'Stop requested - waiting for current Discord image generation to complete',
       details: { sessionId }
     }]);
   };
@@ -302,8 +301,9 @@ export default function Home() {
       return;
     }
 
-    // Reset abort flag
+    // Reset abort and stopping flags
     setProcessingAborted(false);
+    setIsStopping(false);
 
     // Generate unique session ID for this batch
     const newSessionId = `batch_${Date.now()}_${Math.random()
@@ -708,12 +708,23 @@ export default function Home() {
               {isProcessing && (
                 <button
                   onClick={handleStopProcessing}
-                  className="group flex items-center space-x-3 px-6 py-4 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 rounded-xl font-semibold text-white shadow-2xl transition-all hover:scale-105 cursor-pointer"
+                  disabled={isStopping}
+                  className={`group flex items-center space-x-3 px-6 py-4 rounded-xl font-semibold text-white shadow-2xl transition-all ${
+                    isStopping 
+                      ? 'bg-gradient-to-r from-orange-600 to-orange-500 cursor-not-allowed opacity-75' 
+                      : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 hover:scale-105 cursor-pointer'
+                  }`}
                 >
                   <div className="h-6 w-6 flex items-center justify-center">
-                    <div className="h-3 w-3 bg-white rounded-sm"></div>
+                    {isStopping ? (
+                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <div className="h-3 w-3 bg-white rounded-sm"></div>
+                    )}
                   </div>
-                  <span className="text-lg">Stop Processing</span>
+                  <span className="text-lg">
+                    {isStopping ? 'Stopping...' : 'Stop Processing'}
+                  </span>
                 </button>
               )}
             </div>
@@ -726,6 +737,7 @@ export default function Home() {
             onViewResults={handleViewResults}
             progressData={progressData}
             serverUpdates={serverUpdates}
+            isStopping={isStopping}
           />
         </div>
       </main>
