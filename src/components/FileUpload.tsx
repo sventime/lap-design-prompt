@@ -199,16 +199,15 @@ export default function FileUpload({ onFilesUpload, disabled = false }: FileUplo
                     alt={file.file.name}
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   
                   <button
                     onClick={() => removeFile(file.id)}
-                    className="absolute top-3 right-3 bg-red-500/80 backdrop-blur-sm text-white rounded-full p-2 hover:bg-red-500 transition-all hover:scale-110 cursor-pointer"
+                    className="absolute top-3 right-3 bg-red-500/80 backdrop-blur-sm text-white rounded-full p-2 hover:bg-red-500 transition-all hover:scale-110 cursor-pointer shadow-lg hover:shadow-xl"
                   >
                     <X className="h-4 w-4" />
                   </button>
                   
-                  <div className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm border ${
+                  <div className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm border shadow-lg ${
                     file.status === 'pending' ? 'bg-gray-800/80 text-gray-200 border-gray-600' :
                     file.status === 'processing' ? 'bg-blue-800/80 text-blue-200 border-blue-600' :
                     file.status === 'completed' ? 'bg-green-800/80 text-green-200 border-green-600' :
@@ -217,7 +216,7 @@ export default function FileUpload({ onFilesUpload, disabled = false }: FileUplo
                     {file.status}
                   </div>
                   
-                  <div className={`absolute top-3 right-12 px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm border ${
+                  <div className={`absolute top-3 right-12 px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm border shadow-lg ${
                     file.promptType === 'outfit' 
                       ? 'bg-blue-500/80 text-blue-100 border-blue-400' 
                       : 'bg-purple-500/80 text-purple-100 border-purple-400'
@@ -238,8 +237,8 @@ export default function FileUpload({ onFilesUpload, disabled = false }: FileUplo
                         onClick={() => updatePromptType(file.id, 'outfit')}
                         className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
                           file.promptType === 'outfit'
-                            ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg'
-                            : 'text-gray-400 hover:text-gray-300'
+                            ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg hover:shadow-xl'
+                            : 'text-gray-400 hover:text-gray-300 hover:shadow-md'
                         }`}
                       >
                         Outfit
@@ -248,8 +247,8 @@ export default function FileUpload({ onFilesUpload, disabled = false }: FileUplo
                         onClick={() => updatePromptType(file.id, 'texture')}
                         className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
                           file.promptType === 'texture'
-                            ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-lg'
-                            : 'text-gray-400 hover:text-gray-300'
+                            ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-lg hover:shadow-xl'
+                            : 'text-gray-400 hover:text-gray-300 hover:shadow-md'
                         }`}
                       >
                         Texture
@@ -265,8 +264,8 @@ export default function FileUpload({ onFilesUpload, disabled = false }: FileUplo
                           onClick={() => updateGenderType(file.id, 'female')}
                           className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
                             file.genderType === 'female'
-                              ? 'bg-gradient-to-r from-pink-600 to-rose-500 text-white shadow-lg'
-                              : 'text-gray-400 hover:text-gray-300'
+                              ? 'bg-gradient-to-r from-pink-600 to-rose-500 text-white shadow-lg hover:shadow-xl'
+                              : 'text-gray-400 hover:text-gray-300 hover:shadow-md'
                           }`}
                         >
                           Female
@@ -275,8 +274,8 @@ export default function FileUpload({ onFilesUpload, disabled = false }: FileUplo
                           onClick={() => updateGenderType(file.id, 'male')}
                           className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all duration-200 cursor-pointer ${
                             file.genderType === 'male'
-                              ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg'
-                              : 'text-gray-400 hover:text-gray-300'
+                              ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg hover:shadow-xl'
+                              : 'text-gray-400 hover:text-gray-300 hover:shadow-md'
                           }`}
                         >
                           Male
