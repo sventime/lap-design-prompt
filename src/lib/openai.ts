@@ -135,25 +135,19 @@ Do not include /imagine command.`,
     // Auto-send to Midjourney if requested
     if (result.midjourneyPrompts.length > 0) {
       try {
-        console.log("[OpenAI] Auto-sending first prompt to Midjourney...");
-        console.log(`[OpenAI] First prompt: ${result.midjourneyPrompts[0]}`);
+        console.log("[OpenAI] Auto-sending all prompts to Midjourney...");
+        console.log(`[OpenAI] Sending ${result.midjourneyPrompts.length} prompts`);
 
-        const { sendPromptToMidjourney } = await import("./midjourney");
-        const midjourneyResult = await sendPromptToMidjourney(
-          result.midjourneyPrompts[0]
+        const { sendMultiplePromptsToMidjourney } = await import("./midjourney");
+        const midjourneyResult = await sendMultiplePromptsToMidjourney(
+          result.midjourneyPrompts
         );
 
-        console.log("[OpenAI] Midjourney result:", midjourneyResult);
+        console.log("[OpenAI] Midjourney results:", midjourneyResult);
 
         return {
           ...result,
-          midjourneyResults: [
-            {
-              prompt: result.midjourneyPrompts[0],
-              messageId: midjourneyResult.messageId,
-              error: midjourneyResult.error,
-            },
-          ],
+          midjourneyResults: midjourneyResult.results,
         };
       } catch (midjourneyError) {
         console.error(
@@ -167,15 +161,13 @@ Do not include /imagine command.`,
         // Return the prompts even if Midjourney sending fails
         return {
           ...result,
-          midjourneyResults: [
-            {
-              prompt: result.midjourneyPrompts[0],
-              error:
-                midjourneyError instanceof Error
-                  ? midjourneyError.message
-                  : "Unknown error in auto-send",
-            },
-          ],
+          midjourneyResults: result.midjourneyPrompts.map(prompt => ({
+            prompt,
+            error:
+              midjourneyError instanceof Error
+                ? midjourneyError.message
+                : "Unknown error in auto-send",
+          })),
         };
       }
     }
