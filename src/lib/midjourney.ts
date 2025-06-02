@@ -75,34 +75,6 @@ async function uploadImageToDiscord(imageBase64: string): Promise<string> {
     const discordImageUrl = messageData.attachments[0].url;
     console.log(`[Discord] Image uploaded successfully: ${discordImageUrl}`);
 
-    // Optionally delete the message after getting the URL
-    setTimeout(async () => {
-      try {
-        const deleteResponse = await fetch(
-          `https://discord.com/api/v10/channels/${process.env.DISCORD_CHANNEL_ID}/messages/${messageData.id}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: process.env.DISCORD_TOKEN,
-            },
-          }
-        );
-
-        if (deleteResponse.ok) {
-          console.log(`[Discord] Cleanup: Deleted temporary message`);
-        } else {
-          console.warn(
-            `[Discord] Could not delete temporary message: ${deleteResponse.status}`
-          );
-        }
-      } catch (deleteError) {
-        console.warn(
-          `[Discord] Could not delete temporary message:`,
-          deleteError
-        );
-      }
-    }, 5000); // Delete after 5 seconds
-
     return discordImageUrl;
   } catch (error) {
     console.error("[Discord] Error uploading image:", error);
