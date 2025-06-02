@@ -103,8 +103,11 @@ export async function generateMidjourneyPrompt(
       model: "gpt-4o",
       messages: [
         {
-          role: "system",
-          content: `You are a fashion design expert with advanced vision capabilities. You can see and analyze images perfectly. You will be provided with an image that you MUST visually analyze to create detailed Midjourney prompts for ${clothingPart}.
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `You are a fashion design expert with advanced vision capabilities. You can see and analyze images perfectly. You will be provided with an image that you MUST visually analyze to create detailed Midjourney prompts for ${clothingPart}.
 
 ${
   promptType === "outfit"
@@ -113,7 +116,7 @@ Requirements:
 - Focus specifically on the ${clothingPart}
 - Show detailed view of design and fit
 - Professional fashion photography style
-- Use contrasting background to highlight the ${clothingPart}
+- Always add "on contrasting background" to highlight the ${clothingPart}
 - Use parameters like --ar 2:3 --q 2 --s 250 --fast
 
 IMPORTANT FORMATTING:
@@ -138,15 +141,16 @@ Requirements:
 - Mention fabric behavior (drape, stretch, stiffness)
 - Use macro photography perspective
 - Add lighting that shows texture depth
+- Force Midjourney to generate exatrly a texture, not an outfit or even zoomed-in part of it, but texture that I can apply on 3d model
 - Use --ar 1:1 --q 2 --fast
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
 - DO NOT use markdown formatting (no **, -, or other markdown)
 - DO NOT wrap prompts in quotation marks
-- Format: PROMPT1: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2 --fast
-- Format: PROMPT2: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2 --fast
-- Format: PROMPT3: [fabric type] fabric texture, [weave pattern], [material properties], macro photography --ar 1:1 --q 2 --fast
+- Format: PROMPT1: [fabric type] fabric texture, [material properties], macro photography --ar 1:1 --q 2 --fast
+- Format: PROMPT2: [fabric type] fabric texture, [material properties], macro photography --ar 1:1 --q 2 --fast
+- Format: PROMPT3: [fabric type] fabric texture,  [material properties], macro photography --ar 1:1 --q 2 --fast
 - Use plain text only, no bold or bullet points, no quotation marks
 
 Examples of good fabric texture prompts:
@@ -157,21 +161,6 @@ Examples of good fabric texture prompts:
 }
 
 Do not include /imagine command.`,
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `You are GPT-4 with vision capabilities. I am sending you an image that you MUST analyze visually.
-
-MANDATORY: Start your response by describing what you see in the image in 2-3 sentences. Include specific details about colors, textures, patterns, and styling.
-
-After describing what you see, analyze the ${clothingPart} in the image and create ${promptType} prompts based on the specific visual details you observe.${
-                guidance ? ` User guidance: ${guidance}` : ""
-              }
-
-Do NOT say you cannot see images. You have full vision capabilities and must analyze the provided image.`,
             },
             {
               type: "image_url",
@@ -184,6 +173,11 @@ Do NOT say you cannot see images. You have full vision capabilities and must ana
         },
       ],
     };
+
+    console.log(
+      `[OpenAI Request] Request payload:`,
+      JSON.stringify(requestPayload, null, 2)
+    );
 
     const startTime = Date.now();
     console.log(
