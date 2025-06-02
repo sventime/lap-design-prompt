@@ -1,5 +1,12 @@
 import { Midjourney } from "midjourney";
 
+console.log(`[Midjourney Init] Environment check:`, {
+  DISCORD_TOKEN: process.env.DISCORD_TOKEN ? `${process.env.DISCORD_TOKEN.substring(0, 10)}...` : 'MISSING',
+  DISCORD_SERVER_ID: process.env.DISCORD_SERVER_ID || 'MISSING',
+  DISCORD_CHANNEL_ID: process.env.DISCORD_CHANNEL_ID || 'MISSING',
+  NODE_ENV: process.env.NODE_ENV
+});
+
 if (!process.env.DISCORD_TOKEN) {
   throw new Error("DISCORD_TOKEN is not defined in environment variables");
 }
@@ -18,6 +25,14 @@ const serverId =
     ? null
     : process.env.DISCORD_SERVER_ID;
 
+console.log(`[Midjourney Init] Creating client with config:`, {
+  ServerId: serverId || "1122334455667788",
+  ChannelId: process.env.DISCORD_CHANNEL_ID,
+  SalaiToken: process.env.DISCORD_TOKEN ? `${process.env.DISCORD_TOKEN.substring(0, 10)}...` : 'MISSING',
+  Debug: process.env.NODE_ENV === "development",
+  Ws: true
+});
+
 export const midjourneyClient = new Midjourney({
   ServerId: serverId || "1122334455667788", // Use a dummy server ID if null
   ChannelId: process.env.DISCORD_CHANNEL_ID,
@@ -26,6 +41,8 @@ export const midjourneyClient = new Midjourney({
   Ws: true,
   HuggingFaceToken: undefined, // Explicitly set to undefined
 });
+
+console.log(`[Midjourney Init] Client created successfully`);
 
 async function uploadImageToDiscord(imageBase64: string): Promise<string> {
   try {
@@ -48,6 +65,12 @@ async function uploadImageToDiscord(imageBase64: string): Promise<string> {
     );
 
     // Send to Discord REST API
+    console.log(`[Discord] Making request to: https://discord.com/api/v10/channels/${process.env.DISCORD_CHANNEL_ID}/messages`);
+    console.log(`[Discord] Request headers:`, {
+      Authorization: process.env.DISCORD_TOKEN ? `${process.env.DISCORD_TOKEN.substring(0, 10)}...` : 'MISSING',
+      'Content-Type': 'multipart/form-data'
+    });
+    
     const response = await fetch(
       `https://discord.com/api/v10/channels/${process.env.DISCORD_CHANNEL_ID}/messages`,
       {
@@ -59,14 +82,30 @@ async function uploadImageToDiscord(imageBase64: string): Promise<string> {
       }
     );
 
+    console.log(`[Discord] Response status: ${response.status} ${response.statusText}`);
+    console.log(`[Discord] Response headers:`, Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[Discord] Error response body:`, errorText);
       throw new Error(
         `Discord API error: ${response.status} ${response.statusText} - ${errorText}`
       );
     }
 
-    const messageData = await response.json();
+    const responseText = await response.text();
+    console.log(`[Discord] Raw response text:`, responseText);
+    console.log(`[Discord] Response text length:`, responseText.length);
+    
+    let messageData;
+    try {
+      messageData = JSON.parse(responseText);
+      console.log(`[Discord] Parsed response data:`, messageData);
+    } catch (parseError) {
+      console.error(`[Discord] JSON parsing failed:`, parseError);
+      console.error(`[Discord] Raw response that failed to parse:`, responseText);
+      throw new Error(`Failed to parse Discord API response: ${parseError.message}`);
+    }
 
     if (!messageData.attachments || messageData.attachments.length === 0) {
       throw new Error("No attachments found in Discord message response");
@@ -103,9 +142,28 @@ export async function sendPromptToMidjourney(
     }
 
     console.log(`[Midjourney] Connecting to Discord...`);
+    console.log(`[Midjourney] Client configuration:`, {
+      ServerId: midjourneyClient.config?.ServerId,
+      ChannelId: midjourneyClient.config?.ChannelId,
+      SalaiToken: midjourneyClient.config?.SalaiToken ? `${midjourneyClient.config.SalaiToken.substring(0, 10)}...` : 'MISSING',
+      Debug: midjourneyClient.config?.Debug,
+      Ws: midjourneyClient.config?.Ws
+    });
 
     // Add timeout to connection (30 seconds)
-    const connectPromise = midjourneyClient.Connect();
+    const connectPromise = midjourneyClient.Connect().catch(error => {
+      console.error(`[Midjourney] Connection error details:`, error);
+      console.error(`[Midjourney] Error name:`, error.name);
+      console.error(`[Midjourney] Error message:`, error.message);
+      console.error(`[Midjourney] Error stack:`, error.stack);
+      if (error.response) {
+        console.error(`[Midjourney] Error response status:`, error.response.status);
+        console.error(`[Midjourney] Error response headers:`, error.response.headers);
+        console.error(`[Midjourney] Error response data:`, error.response.data);
+      }
+      throw error;
+    });
+    
     const connectTimeoutPromise = new Promise((_, reject) =>
       setTimeout(
         () => reject(new Error("Connection timeout after 30 seconds")),
@@ -232,8 +290,21 @@ export async function sendMultiplePromptsToMidjourney(
   cdnImageUrl?: string;
 }> {
   try {
-    await midjourneyClient.Connect();
-
+    console.log(`[Midjourney Batch] Starting connection for ${prompts.length} prompts`);
+    console.log(`[Midjourney Batch] Session ID: ${sessionId || 'none'}`);
+    
+    const connectResult = await midjourneyClient.Connect().catch(error => {
+      console.error(`[Midjourney Batch] Connection failed:`, error);
+      console.error(`[Midjourney Batch] Error details:`, {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        response: error.response
+      });
+      throw error;
+    });
+    
+    console.log(`[Midjourney Batch] Connection successful:`, connectResult);
     const results = [];
 
     // Upload image to Discord once for all prompts if provided
