@@ -18,6 +18,7 @@ export default function Home() {
   const [showResults, setShowResults] = useState(false);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const [sendToMidjourney, setSendToMidjourney] = useState(true);
 
   // Initialize state from session storage or defaults
   const [images, setImages] = useState<UploadedImage[]>([]);
@@ -386,7 +387,7 @@ export default function Home() {
       total: images.length,
       completed: 0,
       processing: 0,
-      status: "Starting batch processing...",
+      status: `Starting batch processing${sendToMidjourney ? ' with Midjourney' : ' (prompts only)'}...`,
       currentItem: null,
       midjourneyProgress: undefined,
     });
@@ -436,6 +437,7 @@ export default function Home() {
         body: JSON.stringify({
           items: batchItems,
           sessionId: newSessionId,
+          sendToMidjourney: sendToMidjourney,
         }),
       });
 
@@ -595,10 +597,10 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div className="flex-shrink-0 ml-2 sm:ml-4">
+            <div className="flex items-center space-x-3 flex-shrink-0 ml-2 sm:ml-4">
               <div className="text-xs sm:text-sm text-indigo-300 font-medium px-2 sm:px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20">
-                <span className="hidden sm:inline">Pinterest → Midjourney</span>
-                <span className="sm:hidden">MJ</span>
+                <span className="hidden sm:inline">Pinterest → AI</span>
+                <span className="sm:hidden">AI</span>
               </div>
             </div>
           </div>
@@ -819,47 +821,87 @@ export default function Home() {
 
           {/* Action Buttons */}
           {images.length > 0 && (
-            <div className="flex items-center justify-center space-x-4">
-              <button
-                onClick={handleProcessAll}
-                disabled={isProcessing || images.length === 0}
-                className="group btn-premium flex items-center space-x-3 px-8 py-4 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl cursor-pointer"
-              >
-                <Wand2
-                  className={`h-6 w-6 ${
-                    isProcessing ? "animate-spin" : "group-hover:rotate-12"
-                  } transition-transform`}
-                />
-                <span className="text-lg">
-                  {isProcessing
-                    ? "Generating Magic..."
-                    : `Generate Prompts for ${images.length} Images`}
-                </span>
-              </button>
-              
-              {/* Stop Processing Button */}
-              {isProcessing && (
-                <button
-                  onClick={handleStopProcessing}
-                  disabled={isStopping}
-                  className={`group flex items-center space-x-3 px-6 py-4 rounded-xl font-semibold text-white shadow-2xl transition-all ${
-                    isStopping 
-                      ? 'bg-gradient-to-r from-orange-600 to-orange-500 cursor-not-allowed opacity-75' 
-                      : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 hover:scale-105 cursor-pointer'
-                  }`}
-                >
-                  <div className="h-6 w-6 flex items-center justify-center">
-                    {isStopping ? (
-                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <div className="h-3 w-3 bg-white rounded-sm"></div>
-                    )}
+            <div className="space-y-4">
+              {/* Processing Mode Toggle */}
+              <div className="flex items-center justify-center">
+                <div className="glass rounded-xl px-6 py-4 border border-gray-700/50">
+                  <div className="flex items-center space-x-4">
+                    <div className="text-sm text-gray-300 font-medium">
+                      Processing Mode:
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="relative">
+                        <button
+                          onClick={() => setSendToMidjourney(!sendToMidjourney)}
+                          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                            sendToMidjourney ? 'bg-indigo-600' : 'bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                              sendToMidjourney ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      <div className="text-sm text-gray-300 font-medium min-w-[120px]">
+                        {sendToMidjourney ? 'Send to Midjourney' : 'Prompts Only'}
+                      </div>
+                    </div>
                   </div>
+                  <div className="mt-2 text-xs text-gray-400 text-center">
+                    {sendToMidjourney 
+                      ? 'Generate prompts and automatically send to Midjourney' 
+                      : 'Generate prompts only (no Midjourney sending)'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Generate Button */}
+              <div className="flex items-center justify-center space-x-4">
+                <button
+                  onClick={handleProcessAll}
+                  disabled={isProcessing || images.length === 0}
+                  className="group btn-premium flex items-center space-x-3 px-8 py-4 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl cursor-pointer"
+                >
+                  <Wand2
+                    className={`h-6 w-6 ${
+                      isProcessing ? "animate-spin" : "group-hover:rotate-12"
+                    } transition-transform`}
+                  />
                   <span className="text-lg">
-                    {isStopping ? 'Stopping...' : 'Stop Processing'}
+                    {isProcessing
+                      ? (sendToMidjourney ? "Generating & Sending..." : "Generating Prompts...")
+                      : (sendToMidjourney 
+                          ? `Generate & Send ${images.length} Images` 
+                          : `Generate Prompts for ${images.length} Images`)}
                   </span>
                 </button>
-              )}
+                
+                {/* Stop Processing Button */}
+                {isProcessing && (
+                  <button
+                    onClick={handleStopProcessing}
+                    disabled={isStopping}
+                    className={`group flex items-center space-x-3 px-6 py-4 rounded-xl font-semibold text-white shadow-2xl transition-all ${
+                      isStopping 
+                        ? 'bg-gradient-to-r from-orange-600 to-orange-500 cursor-not-allowed opacity-75' 
+                        : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 hover:scale-105 cursor-pointer'
+                    }`}
+                  >
+                    <div className="h-6 w-6 flex items-center justify-center">
+                      {isStopping ? (
+                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <div className="h-3 w-3 bg-white rounded-sm"></div>
+                      )}
+                    </div>
+                    <span className="text-lg">
+                      {isStopping ? 'Stopping...' : 'Stop Processing'}
+                    </span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

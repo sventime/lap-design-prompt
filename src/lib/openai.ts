@@ -8,6 +8,38 @@ export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+function detectMimeType(base64Data: string, fileName?: string): string {
+  // First try to detect from base64 signatures
+  if (base64Data.startsWith("/9j/")) {
+    return "image/jpeg";
+  }
+  if (base64Data.startsWith("iVBORw0KGgo")) {
+    return "image/png";
+  }
+  if (base64Data.startsWith("UklGR")) {
+    return "image/webp";
+  }
+
+  // Fallback to file extension if provided
+  if (fileName) {
+    const ext = fileName.toLowerCase().split(".").pop();
+    switch (ext) {
+      case "png":
+        return "image/png";
+      case "jpg":
+      case "jpeg":
+        return "image/jpeg";
+      case "webp":
+        return "image/webp";
+      default:
+        return "image/jpeg";
+    }
+  }
+
+  // Default to JPEG if unknown
+  return "image/jpeg";
+}
+
 export async function generateMidjourneyPrompt(
   imageBase64: string,
   clothingPart: string,
@@ -16,8 +48,14 @@ export async function generateMidjourneyPrompt(
   genderType: "male" | "female" = "female",
   guidance?: string,
   autoSendToMidjourney: boolean = true,
-  onMidjourneyProgress?: (promptIndex: number, total: number, status: string, details?: any) => void,
-  sessionId?: string
+  onMidjourneyProgress?: (
+    promptIndex: number,
+    total: number,
+    status: string,
+    details?: any
+  ) => void,
+  sessionId?: string,
+  fileName?: string
 ): Promise<{
   prompt: string;
   midjourneyPrompts: string[];
@@ -34,12 +72,39 @@ export async function generateMidjourneyPrompt(
       `[OpenAI Request] Starting generation for ${clothingPart} (${promptType})`
     );
 
+    // Detect the correct MIME type from the base64 data and filename
+    const mimeType = detectMimeType(imageBase64, fileName);
+    console.log(
+      `[OpenAI] Detected MIME type:`,
+      mimeType,
+      fileName ? `(from file: ${fileName})` : "(from base64 signature)"
+    );
+
+    // Log image data details
+    console.log(`[OpenAI] Image base64 length:`, imageBase64.length);
+    console.log(
+      `[OpenAI] Image base64 starts with:`,
+      imageBase64.substring(0, 50)
+    );
+    console.log(
+      `[OpenAI] Image base64 ends with:`,
+      imageBase64.substring(imageBase64.length - 50)
+    );
+
+    // Check if image data is valid base64
+    try {
+      const decoded = atob(imageBase64.substring(0, 100));
+      console.log(`[OpenAI] Base64 decoding test successful`);
+    } catch (decodeError) {
+      console.error(`[OpenAI] Base64 decoding test failed:`, decodeError);
+    }
+
     const requestPayload = {
       model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: `You are a fashion design expert. Create detailed Midjourney prompts for ${clothingPart}.
+          content: `You are a fashion design expert with advanced vision capabilities. You can see and analyze images perfectly. You will be provided with an image that you MUST visually analyze to create detailed Midjourney prompts for ${clothingPart}.
 
 ${
   promptType === "outfit"
@@ -98,33 +163,89 @@ Do not include /imagine command.`,
           content: [
             {
               type: "text",
-              text: `Analyze this image and create ${promptType} prompts for ${clothingPart}.${
+              text: `You are GPT-4 with vision capabilities. I am sending you an image that you MUST analyze visually.
+
+MANDATORY: Start your response by describing what you see in the image in 2-3 sentences. Include specific details about colors, textures, patterns, and styling.
+
+After describing what you see, analyze the ${clothingPart} in the image and create ${promptType} prompts based on the specific visual details you observe.${
                 guidance ? ` User guidance: ${guidance}` : ""
-              }`,
+              }
+
+Do NOT say you cannot see images. You have full vision capabilities and must analyze the provided image.`,
             },
             {
               type: "image_url",
               image_url: {
-                url: `data:image/jpeg;base64,${imageBase64}`,
+                url: `data:${mimeType};base64,${imageBase64}`,
+                detail: "high",
               },
             },
           ],
         },
       ],
-      max_tokens: 1500,
-      temperature: 0.7,
     };
 
     const startTime = Date.now();
-    const response = await openai.chat.completions.create(requestPayload);
+    console.log(
+      `[OpenAI] Making API call to OpenAI with model: ${requestPayload.model}...`
+    );
+
+    let response;
+    try {
+      response = await openai.chat.completions.create(requestPayload);
+    } catch (modelError) {
+      console.warn(
+        `[OpenAI] Model ${requestPayload.model} failed, trying fallback gpt-4o:`,
+        modelError
+      );
+      requestPayload.model = "gpt-4o";
+      // Also try with jpeg format again
+      if (requestPayload.messages[1]?.content?.[1]?.image_url) {
+        requestPayload.messages[1].content[1].image_url.url = `data:image/jpeg;base64,${imageBase64}`;
+      }
+      try {
+        response = await openai.chat.completions.create(requestPayload);
+      } catch (secondError) {
+        console.warn(
+          `[OpenAI] Second attempt failed, trying with different image format:`,
+          secondError
+        );
+        // Try with auto-detection
+        if (requestPayload.messages[1]?.content?.[1]?.image_url) {
+          requestPayload.messages[1].content[1].image_url.url = `data:image/webp;base64,${imageBase64}`;
+        }
+        response = await openai.chat.completions.create(requestPayload);
+      }
+    }
     const endTime = Date.now();
 
     console.log(`[OpenAI Response] Completed in ${endTime - startTime}ms`);
+    console.log(`[OpenAI Response] Full response structure:`, {
+      id: response.id,
+      object: response.object,
+      created: response.created,
+      model: response.model,
+      choices: response.choices.map((choice, idx) => ({
+        choiceIndex: idx,
+        finishReason: choice.finish_reason,
+        messageRole: choice.message?.role,
+        messageContentLength: choice.message?.content?.length || 0,
+        messageContentStart:
+          choice.message?.content?.substring(0, 200) || "NO_CONTENT",
+      })),
+      usage: response.usage,
+    });
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
       throw new Error("No response from OpenAI");
     }
+
+    console.log(`[OpenAI Response] Content length:`, content.length);
+    console.log(
+      `[OpenAI Response] Content preview:`,
+      content.substring(0, 500)
+    );
 
     // Extract individual prompts from the response with bulletproof parsing
     const prompts = content
@@ -173,7 +294,7 @@ Do not include /imagine command.`,
     };
 
     // Auto-send to Midjourney if requested
-    if (result.midjourneyPrompts.length > 0) {
+    if (autoSendToMidjourney && result.midjourneyPrompts.length > 0) {
       try {
         console.log("[OpenAI] Auto-sending all prompts to Midjourney...");
         console.log(

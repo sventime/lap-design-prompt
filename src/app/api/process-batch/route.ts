@@ -18,7 +18,11 @@ interface BatchItem {
 
 export async function POST(request: NextRequest) {
   try {
-    const { items, sessionId } = await request.json() as { items: BatchItem[], sessionId?: string };
+    const { items, sessionId, sendToMidjourney = true } = await request.json() as { 
+      items: BatchItem[], 
+      sessionId?: string,
+      sendToMidjourney?: boolean 
+    };
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
         total: items.length,
         completed: 0,
         processing: 0,
-        status: 'Starting batch processing...'
+        status: `Starting batch processing${sendToMidjourney ? ' with Midjourney' : ' (prompts only)'}...`
       });
     }
 
@@ -110,7 +114,7 @@ export async function POST(request: NextRequest) {
           item.promptType,
           item.genderType,
           item.guidance,
-          true, // autoSendToMidjourney - will use base64Data directly for Discord attachment
+          sendToMidjourney, // Use the toggle setting
           // Midjourney progress callback
           (promptIndex: number, total: number, status: string, details?: any) => {
             if (sessionId) {
@@ -135,7 +139,8 @@ export async function POST(request: NextRequest) {
               });
             }
           },
-          sessionId // Pass sessionId for abort checking
+          sessionId, // Pass sessionId for abort checking
+          item.fileName // Pass fileName for MIME type detection
         );
 
         const itemResult = {

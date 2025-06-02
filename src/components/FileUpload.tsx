@@ -83,7 +83,9 @@ export default function FileUpload({ onFilesUpload, disabled = false }: FileUplo
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/webp': ['.webp']
     },
     multiple: true,
     disabled: disabled || uploading,
