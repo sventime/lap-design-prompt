@@ -16,7 +16,7 @@ export async function generateMidjourneyPrompt(
   genderType: "male" | "female" = "female",
   guidance?: string,
   autoSendToMidjourney: boolean = true,
-  onMidjourneyProgress?: (promptIndex: number, total: number, status: string) => void,
+  onMidjourneyProgress?: (promptIndex: number, total: number, status: string, details?: any) => void,
   sessionId?: string
 ): Promise<{
   prompt: string;
@@ -27,6 +27,7 @@ export async function generateMidjourneyPrompt(
     messageId?: string;
     error?: string;
   }>;
+  cdnImageUrl?: string;
 }> {
   try {
     console.log(
@@ -194,6 +195,7 @@ Do not include /imagine command.`,
         return {
           ...result,
           midjourneyResults: midjourneyResult.results,
+          cdnImageUrl: midjourneyResult.cdnImageUrl,
         };
       } catch (midjourneyError) {
         console.error(

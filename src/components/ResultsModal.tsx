@@ -128,7 +128,7 @@ export default function ResultsModal({ image, isOpen, onClose }: ResultsModalPro
                 ? image.customClothingPart 
                 : image.clothingPart}</p>
               <p><strong className="text-white">Prompt Type:</strong> {image.promptType === 'outfit' ? 'Complete Outfit' : 'Material Texture'}</p>
-              <p><strong className="text-white">Size:</strong> {formatFileSize(image.file.size)}</p>
+              <p><strong className="text-white">Size:</strong> {formatFileSize(image.fileSize || image.file?.size)}</p>
             </div>
           </div>
 

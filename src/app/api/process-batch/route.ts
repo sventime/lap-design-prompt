@@ -112,10 +112,10 @@ export async function POST(request: NextRequest) {
           item.guidance,
           true, // autoSendToMidjourney - will use base64Data directly for Discord attachment
           // Midjourney progress callback
-          (promptIndex: number, total: number, status: string) => {
+          (promptIndex: number, total: number, status: string, details?: any) => {
             if (sessionId) {
               sendProgressUpdate(sessionId, {
-                type: 'midjourney_progress',
+                type: details?.errorType || 'midjourney_progress',
                 total: items.length,
                 completed: i,
                 processing: 1,
@@ -130,7 +130,8 @@ export async function POST(request: NextRequest) {
                   totalPrompts: total,
                   status
                 },
-                status: `Processing image ${i + 1}/${items.length}: ${status}`
+                status: `Processing image ${i + 1}/${items.length}: ${status}`,
+                details: details // Pass through any additional details including error info
               });
             }
           },
@@ -140,7 +141,9 @@ export async function POST(request: NextRequest) {
         const itemResult = {
           id: item.id,
           success: true,
-          ...result
+          ...result,
+          // Include CDN URL if available
+          cdnImageUrl: result.cdnImageUrl,
         };
         
         results.push(itemResult);

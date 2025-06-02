@@ -132,16 +132,16 @@ export async function sendPromptToMidjourney(
 
     console.log(`[Midjourney] Connecting to Discord...`);
 
-    // Add timeout to connection
+    // Add timeout to connection (30 seconds)
     const connectPromise = midjourneyClient.Connect();
-    const timeoutPromise = new Promise((_, reject) =>
+    const connectTimeoutPromise = new Promise((_, reject) =>
       setTimeout(
         () => reject(new Error("Connection timeout after 30 seconds")),
         30000
       )
     );
 
-    await Promise.race([connectPromise, timeoutPromise]);
+    await Promise.race([connectPromise, connectTimeoutPromise]);
     console.log(`[Midjourney] Successfully connected to Discord`);
 
     console.log(`[Midjourney] Sending Imagine command...`);
@@ -169,7 +169,18 @@ export async function sendPromptToMidjourney(
 
     onProgress?.("Sending prompt to Midjourney...");
     console.log(`[Midjourney] Sending prompt: ${finalPrompt}`);
-    const message = await midjourneyClient.Imagine(finalPrompt);
+    
+    // Add 4-minute timeout for Midjourney response (Discord anti-bot protection)
+    const imaginePromise = midjourneyClient.Imagine(finalPrompt);
+    const imagineTimeoutPromise = new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error("MIDJOURNEY_TIMEOUT")),
+        240000 // 4 minutes
+      )
+    );
+
+    onProgress?.("Waiting for Midjourney response (up to 4 minutes)...");
+    const message = await Promise.race([imaginePromise, imagineTimeoutPromise]);
 
     if (!message) {
       console.error(`[Midjourney] No message returned from Imagine command`);
@@ -199,6 +210,15 @@ export async function sendPromptToMidjourney(
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
 
+    // Handle Midjourney timeout specifically
+    if (errorMessage === "MIDJOURNEY_TIMEOUT") {
+      console.error("[Midjourney] ⏰ Timeout waiting for Midjourney response");
+      return {
+        success: false,
+        error: "MIDJOURNEY_TIMEOUT",
+      };
+    }
+
     if (
       errorMessage.includes("Invalid URL") ||
       errorMessage.includes("not valid JSON")
@@ -226,12 +246,13 @@ export async function sendPromptToMidjourney(
 export async function sendMultiplePromptsToMidjourney(
   prompts: string[],
   imageBase64?: string,
-  onProgress?: (promptIndex: number, total: number, status: string) => void,
+  onProgress?: (promptIndex: number, total: number, status: string, details?: any) => void,
   sessionId?: string
 ): Promise<{
   success: boolean;
   results: Array<{ prompt: string; messageId?: string; error?: string }>;
   aborted?: boolean;
+  cdnImageUrl?: string;
 }> {
   try {
     await midjourneyClient.Connect();
@@ -284,6 +305,7 @@ export async function sendMultiplePromptsToMidjourney(
               success: false,
               aborted: true,
               results,
+              cdnImageUrl: discordImageUrl || undefined,
             };
           }
         } catch (importError) {
@@ -315,7 +337,22 @@ export async function sendMultiplePromptsToMidjourney(
           );
         }
 
-        const message = await midjourneyClient.Imagine(finalPrompt);
+        // Add 4-minute timeout for each individual prompt
+        const imaginePromise = midjourneyClient.Imagine(finalPrompt);
+        const imagineTimeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("MIDJOURNEY_TIMEOUT")),
+            240000 // 4 minutes
+          )
+        );
+
+        onProgress?.(
+          i + 1,
+          prompts.length,
+          `Waiting for Midjourney response (up to 4 minutes)... (${i + 1}/${prompts.length})`
+        );
+
+        const message = await Promise.race([imaginePromise, imagineTimeoutPromise]);
 
         if (message) {
           results.push({
@@ -354,16 +391,44 @@ export async function sendMultiplePromptsToMidjourney(
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         console.error(`[Midjourney] Error sending prompt "${prompt}":`, error);
-        onProgress?.(
-          i + 1,
-          prompts.length,
-          `Prompt ${i + 1}/${prompts.length} failed with error`
-        );
+        
+        // Check if this is a timeout error and provide specific guidance
+        if (errorMessage === "MIDJOURNEY_TIMEOUT") {
+          console.error(`[Midjourney] ⏰ Timeout on prompt ${i + 1}/${prompts.length}`);
+          onProgress?.(
+            i + 1,
+            prompts.length,
+            `Prompt ${i + 1}/${prompts.length} timed out after 4 minutes`,
+            {
+              promptIndex: i + 1,
+              totalPrompts: prompts.length,
+              failedPrompt: prompt,
+              error: "Midjourney response timeout - possible Discord anti-bot check",
+              errorType: 'midjourney_timeout',
+              timeoutDuration: '4 minutes',
+              recoveryInstructions: 'Go to Discord and manually run /imagine to pass anti-bot verification, then restart processing'
+            }
+          );
+        } else {
+          onProgress?.(
+            i + 1,
+            prompts.length,
+            `Prompt ${i + 1}/${prompts.length} failed with error: ${errorMessage}`,
+            {
+              promptIndex: i + 1,
+              totalPrompts: prompts.length,
+              failedPrompt: prompt,
+              error: errorMessage,
+              errorType: 'midjourney_prompt_failed'
+            }
+          );
+        }
+        
         results.push({
           prompt,
-          error:
-            error instanceof Error ? error.message : "Unknown error occurred",
+          error: errorMessage,
         });
       }
     }
@@ -371,6 +436,7 @@ export async function sendMultiplePromptsToMidjourney(
     return {
       success: true,
       results,
+      cdnImageUrl: discordImageUrl || undefined,
     };
   } catch (error) {
     console.error("[Midjourney] Error connecting to Midjourney:", error);

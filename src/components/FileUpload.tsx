@@ -52,15 +52,22 @@ export default function FileUpload({ onFilesUpload, disabled = false }: FileUplo
 
       const data = await response.json();
       
-      const newFiles: UploadedImage[] = data.files.map((file: any) => ({
-        id: file.id,
-        file: acceptedFiles.find(f => f.name === file.name)!,
-        preview: file.preview,
-        clothingPart: 'top' as ClothingPart,
-        promptType: 'outfit' as PromptType,
-        genderType: 'female' as GenderType,
-        status: 'pending' as const,
-      }));
+      const newFiles: UploadedImage[] = data.files.map((file: any) => {
+        const originalFile = acceptedFiles.find(f => f.name === file.name)!;
+        return {
+          id: file.id,
+          file: originalFile,
+          preview: file.preview,
+          clothingPart: 'top' as ClothingPart,
+          promptType: 'outfit' as PromptType,
+          genderType: 'female' as GenderType,
+          status: 'pending' as const,
+          // Store file metadata for session storage persistence
+          fileName: originalFile.name,
+          fileSize: originalFile.size,
+          fileType: originalFile.type,
+        };
+      });
 
       const updatedFiles = [...files, ...newFiles];
       setFiles(updatedFiles);

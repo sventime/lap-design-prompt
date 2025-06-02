@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
-import { CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
+import React, { useState } from "react";
+import { CheckCircle, XCircle, Clock, Loader2, Activity, AlertTriangle, Trash2 } from "lucide-react";
 import { UploadedImage, formatFileSize } from "@/types";
+import ServerUpdatesModal from "./ServerUpdatesModal";
 
 interface ProcessingProgressProps {
   images: UploadedImage[];
@@ -27,6 +28,7 @@ interface ProcessingProgressProps {
     details?: any;
   }>;
   isStopping?: boolean;
+  onClearProcessing?: () => void;
 }
 
 export default function ProcessingProgress({
@@ -36,7 +38,9 @@ export default function ProcessingProgress({
   progressData,
   serverUpdates,
   isStopping,
+  onClearProcessing,
 }: ProcessingProgressProps) {
+  const [showServerUpdatesModal, setShowServerUpdatesModal] = useState(false);
   const activeImages = images; // images array now only contains pending/processing
 
   // Use real-time progress data if available, otherwise fallback to local calculation
@@ -95,6 +99,19 @@ export default function ProcessingProgress({
           <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
             Processing Progress
           </h3>
+          
+          {/* Clear Processing Button */}
+          {(totalActiveImages > 0 || isProcessing) && onClearProcessing && (
+            <button
+              onClick={onClearProcessing}
+              className="flex items-center space-x-2 px-3 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-500 hover:to-red-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-xs sm:text-sm"
+              title="Clear stuck processing data from session storage (keeps completed results)"
+            >
+              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Clear Processing</span>
+              <span className="sm:hidden">Clear</span>
+            </button>
+          )}
         </div>
 
         {/* Current Item Being Processed */}
@@ -316,7 +333,7 @@ export default function ProcessingProgress({
                       {image.promptType === "outfit" ? "Outfit" : "Texture"}
                     </span>
                     <span className="text-xs sm:text-sm text-gray-300">
-                      {formatFileSize(image.file.size)}
+                      {formatFileSize(image.fileSize || image.file?.size)}
                     </span>
                   </div>
                   {image.error && (
@@ -371,97 +388,153 @@ export default function ProcessingProgress({
         </div>
       )}
 
-      {/* Server Updates Log */}
+      {/* Server Updates Summary */}
       {serverUpdates && serverUpdates.length > 0 && (
         <div className="glass rounded-2xl border border-gray-700/50 overflow-hidden">
           <div className="p-4 sm:p-6 border-b border-gray-700/50">
-            <h4 className="text-lg sm:text-xl font-semibold text-white">
-              Server Updates
-            </h4>
-            <p className="text-xs sm:text-sm text-gray-400 mt-1">
-              Real-time processing status from server
-            </p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="relative">
+                  <Activity className="h-5 w-5 text-indigo-400" />
+                  <div className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-indigo-400 rounded-full animate-pulse"></div>
+                </div>
+                <div>
+                  <h4 className="text-lg sm:text-xl font-semibold text-white">
+                    Server Updates
+                  </h4>
+                  <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                    Real-time processing status • {serverUpdates.length} updates
+                    {serverUpdates.filter(update => 
+                      update.type.includes('failed') || update.type.includes('error') || 
+                      (update.details?.errorType && update.details.errorType.includes('failed'))
+                    ).length > 0 && (
+                      <span className="ml-2 px-2 py-0.5 bg-red-500/20 text-red-300 rounded text-xs">
+                        {serverUpdates.filter(update => 
+                          update.type.includes('failed') || update.type.includes('error') || 
+                          (update.details?.errorType && update.details.errorType.includes('failed'))
+                        ).length} errors
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowServerUpdatesModal(true)}
+                className="flex items-center space-x-2 px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base"
+              >
+                <Activity className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="hidden sm:inline">View All Updates</span>
+                <span className="sm:hidden">View All</span>
+              </button>
+            </div>
           </div>
-          <div className="max-h-80 overflow-y-auto">
-            <div className="divide-y divide-gray-700/30">
-              {serverUpdates.reverse().map((update, index) => {
-                const isRecent = Date.now() - update.timestamp < 5000; // Highlight updates from last 5 seconds
-                const typeColors = {
-                  batch_started:
-                    "text-blue-400 bg-blue-500/10 border-blue-500/20",
-                  progress_update:
-                    "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
-                  midjourney_progress:
-                    "text-purple-400 bg-purple-500/10 border-purple-500/20",
-                  item_completed:
-                    "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-                  item_failed: "text-red-400 bg-red-500/10 border-red-500/20",
-                  batch_completed:
-                    "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-                  processing_stopping:
-                    "text-orange-400 bg-orange-500/10 border-orange-500/20",
-                  processing_stopped:
-                    "text-red-400 bg-red-500/10 border-red-500/20",
-                  batch_aborted: "text-red-400 bg-red-500/10 border-red-500/20",
-                  default: "text-gray-400 bg-gray-500/10 border-gray-500/20",
-                };
+          
+          {/* Recent Updates Preview - Table Layout */}
+          <div className="p-4 sm:p-6">
+            <div className="overflow-hidden">
+              <table className="w-full">
+                <tbody className="divide-y divide-gray-700/30">
+                  {serverUpdates.slice(0, 3).map((update, index) => {
+                    const isError = update.type.includes('failed') || update.type.includes('error') || 
+                                   (update.details?.errorType && update.details.errorType.includes('failed'));
+                    const isTimeout = update.details?.errorType === 'midjourney_timeout';
+                    const isRecent = Date.now() - update.timestamp < 5000;
+                    
+                    const typeColors = {
+                      batch_started: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+                      progress_update: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+                      midjourney_progress: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+                      midjourney_prompt_failed: "text-red-400 bg-red-500/10 border-red-500/20",
+                      midjourney_timeout: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+                      item_completed: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                      item_failed: "text-red-400 bg-red-500/10 border-red-500/20",
+                      batch_completed: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                      processing_stopping: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+                      processing_stopped: "text-red-400 bg-red-500/10 border-red-500/20",
+                      batch_aborted: "text-red-400 bg-red-500/10 border-red-500/20",
+                      default: "text-gray-400 bg-gray-500/10 border-gray-500/20",
+                    };
 
-                const colorClass =
-                  typeColors[update.type as keyof typeof typeColors] ||
-                  typeColors.default;
-
-                return (
-                  <div
-                    key={`${update.timestamp}-${index}`}
-                    className={`p-3 sm:p-4 hover:bg-gray-800/20 transition-all ${
-                      isRecent
-                        ? "bg-indigo-500/5 border-l-2 border-indigo-400"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-start space-x-2 sm:space-x-3">
-                      <div
-                        className={`px-2 py-1 rounded-full text-xs font-medium border ${colorClass} mt-0.5 flex-shrink-0`}
+                    const colorClass = typeColors[update.type as keyof typeof typeColors] || typeColors.default;
+                    
+                    return (
+                      <tr
+                        key={`${update.timestamp}-${index}`}
+                        className={`transition-all hover:bg-gray-800/20 ${
+                          isRecent ? "bg-indigo-500/5" : ""
+                        } ${isError ? "border-l-4 border-l-red-500/60" : ""} ${isTimeout ? "border-l-4 border-l-orange-500/60" : ""}`}
                       >
-                        <span className="hidden sm:inline">
-                          {update.type.replace("_", " ").toUpperCase()}
-                        </span>
-                        <span className="sm:hidden">
-                          {update.type.split("_")[0].toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs sm:text-sm text-white font-medium mb-1">
-                          {update.message}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          <span className="block sm:inline">
-                            {new Date(update.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
-                          </span>
-                          {update.details && (
-                            <span className="block sm:inline sm:ml-2 text-gray-500 mt-1 sm:mt-0">
-                              <span className="hidden sm:inline">• </span>
-                              <span className="break-all">
-                                {JSON.stringify(update.details).slice(0, 80)}
-                                {JSON.stringify(update.details).length > 80
-                                  ? "..."
-                                  : ""}
+                        {/* Fixed width column for badges */}
+                        <td className="w-80 py-3 pr-4 align-top">
+                          <div className="flex items-start space-x-2">
+                            {isTimeout && (
+                              <div className="px-2 py-1 rounded-full text-xs font-medium border bg-orange-500/20 text-orange-300 border-orange-500/30 flex items-center space-x-1 flex-shrink-0">
+                                <Clock className="h-3 w-3" />
+                                <span className="hidden sm:inline">TIMEOUT</span>
+                              </div>
+                            )}
+                            {isError && !isTimeout && (
+                              <div className="px-2 py-1 rounded-full text-xs font-medium border bg-red-500/20 text-red-300 border-red-500/30 flex items-center space-x-1 flex-shrink-0">
+                                <AlertTriangle className="h-3 w-3" />
+                                <span className="hidden sm:inline">ERROR</span>
+                              </div>
+                            )}
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium border ${colorClass} flex-shrink-0`}>
+                              <span className="hidden sm:inline whitespace-nowrap">
+                                {update.type.replace("_", " ").toUpperCase()}
                               </span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {isRecent && (
-                        <div className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse flex-shrink-0 mt-1"></div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                              <span className="sm:hidden">
+                                {update.type.split("_")[0].toUpperCase()}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        
+                        {/* Flexible content column */}
+                        <td className="py-3 align-top">
+                          <div className="space-y-1">
+                            <div className="text-sm text-white font-medium">
+                              {update.message}
+                            </div>
+                            <div className="text-xs text-gray-400 flex items-center space-x-2">
+                              <span>
+                                {new Date(update.timestamp).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit",
+                                })}
+                              </span>
+                              {isRecent && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-indigo-400 font-medium animate-pulse">Recent</span>
+                                </>
+                              )}
+                              {update.details && Object.keys(update.details).length > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-gray-500">Has details</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              
+              {serverUpdates.length > 3 && (
+                <div className="text-center pt-4 border-t border-gray-700/30 mt-3">
+                  <button
+                    onClick={() => setShowServerUpdatesModal(true)}
+                    className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                  >
+                    View {serverUpdates.length - 3} more updates...
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -478,6 +551,14 @@ export default function ProcessingProgress({
           </div>
         </div>
       )}
+
+      {/* Server Updates Modal */}
+      <ServerUpdatesModal
+        isOpen={showServerUpdatesModal}
+        onClose={() => setShowServerUpdatesModal(false)}
+        serverUpdates={serverUpdates || []}
+      />
     </div>
   );
 }
+

@@ -15,6 +15,11 @@ export interface UploadedImage {
   completedId?: number;
   generatedAt?: Date;
   processingId?: string;
+  cdnImageUrl?: string; // CDN link from server after Midjourney upload
+  // File metadata for session storage persistence
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
 }
 
 export type ClothingPart = 'top' | 'bottom' | 'shoes' | 'accessories' | 'dress' | 'outerwear' | 'hair' | 'features' | 'other';
@@ -53,7 +58,11 @@ export interface ProcessingResult {
 }
 
 // Utility function to format file sizes
-export function formatFileSize(bytes: number): string {
+export function formatFileSize(bytes?: number): string {
+  if (!bytes || isNaN(bytes) || bytes <= 0) {
+    return "Unknown size";
+  }
+  
   if (bytes < 1024) {
     return `${bytes}B`;
   } else if (bytes < 1024 * 1024) {

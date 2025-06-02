@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Wand2, Upload, Zap, Download, List } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import ProcessingProgress from "@/components/ProcessingProgress";
@@ -8,22 +8,25 @@ import ResultsModal from "@/components/ResultsModal";
 import CompletedResultsModal from "@/components/CompletedResultsModal";
 import { UploadedImage, formatFileSize } from "@/types";
 import { getVersionDisplay } from "@/lib/version";
+import { sessionStorageManager } from "@/lib/sessionStorage";
 
 export default function Home() {
-  const [images, setImages] = useState<UploadedImage[]>([]);
-  const [completedImages, setCompletedImages] = useState<UploadedImage[]>([]);
   const { version, buildTime } = getVersionDisplay();
-  const [completedIdCounter, setCompletedIdCounter] = useState(1);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingAborted, setProcessingAborted] = useState(false);
-  const [isStopping, setIsStopping] = useState(false);
   const [selectedImage, setSelectedImage] = useState<UploadedImage | null>(
     null
   );
   const [showResults, setShowResults] = useState(false);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
+  const [eventSource, setEventSource] = useState<EventSource | null>(null);
 
-  // Real-time progress state
+  // Initialize state from session storage or defaults
+  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [completedImages, setCompletedImages] = useState<UploadedImage[]>([]);
+  const [completedIdCounter, setCompletedIdCounter] = useState(1);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingAborted, setProcessingAborted] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const [sessionId, setSessionId] = useState("");
   const [progressData, setProgressData] = useState({
     total: 0,
     completed: 0,
@@ -32,14 +35,59 @@ export default function Home() {
     currentItem: null as any,
     midjourneyProgress: undefined as any,
   });
-  const [sessionId, setSessionId] = useState("");
-  const [eventSource, setEventSource] = useState<EventSource | null>(null);
   const [serverUpdates, setServerUpdates] = useState<Array<{
     timestamp: number;
     type: string;
     message: string;
     details?: any;
   }>>([]);
+
+  // Restore state from session storage on mount
+  useEffect(() => {
+    const restoredState = sessionStorageManager.restoreState();
+    setImages(restoredState.images);
+    setCompletedImages(restoredState.completedImages);
+    setCompletedIdCounter(restoredState.completedIdCounter);
+    setIsProcessing(restoredState.isProcessing);
+    setProcessingAborted(restoredState.processingAborted);
+    setIsStopping(restoredState.isStopping);
+    setSessionId(restoredState.sessionId);
+    setProgressData(restoredState.progressData);
+    setServerUpdates(restoredState.serverUpdates);
+
+    // If we were processing when the page was reloaded, try to reconnect to SSE
+    if (restoredState.isProcessing && restoredState.sessionId) {
+      console.log('[SESSION] Restored processing session, reconnecting to SSE:', restoredState.sessionId);
+      setupSSEConnection(restoredState.sessionId);
+    }
+  }, []);
+
+  // Save state to session storage whenever important state changes
+  useEffect(() => {
+    sessionStorageManager.saveProcessingState(
+      images,
+      isProcessing,
+      sessionId,
+      progressData,
+      serverUpdates,
+      processingAborted,
+      isStopping
+    );
+  }, [images, isProcessing, sessionId, progressData, serverUpdates, processingAborted, isStopping]);
+
+  // Save completed results separately
+  useEffect(() => {
+    sessionStorageManager.saveCompletedResults(completedImages, completedIdCounter);
+  }, [completedImages, completedIdCounter]);
+
+  // Cleanup session storage and event source on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [eventSource]);
 
   // Setup SSE connection
   const setupSSEConnection = (sessionId: string) => {
@@ -129,6 +177,8 @@ export default function Home() {
                         midjourneyPrompts: data.itemResult.midjourneyPrompts,
                         outfitNames: data.itemResult.outfitNames,
                         error: data.itemResult.error,
+                        // Update preview with CDN link if provided by server
+                        preview: data.itemResult.cdnImageUrl || img.preview,
                       }
                     : img
                 );
@@ -218,6 +268,15 @@ export default function Home() {
               es.close();
               setEventSource(null);
             }, 1000);
+
+            // Clear processing session data (keep completed results)
+            setTimeout(() => {
+              const currentCompleted = sessionStorageManager.load()?.completedImages || [];
+              const currentCounter = sessionStorageManager.load()?.completedIdCounter || 1;
+              sessionStorageManager.clear();
+              // Restore only completed data
+              sessionStorageManager.saveCompletedResults(currentCompleted, currentCounter);
+            }, 2000);
 
             // Smooth scroll to top when all images are processed
             window.scrollTo({
@@ -445,6 +504,60 @@ export default function Home() {
     URL.revokeObjectURL(url);
   };
 
+  const clearSessionData = () => {
+    if (confirm("Are you sure you want to clear all session data? This will remove all completed results and processing history.")) {
+      sessionStorageManager.clear();
+      setImages([]);
+      setCompletedImages([]);
+      setCompletedIdCounter(1);
+      setIsProcessing(false);
+      setProcessingAborted(false);
+      setIsStopping(false);
+      setSessionId("");
+      setProgressData({
+        total: 0,
+        completed: 0,
+        processing: 0,
+        status: "",
+        currentItem: null,
+        midjourneyProgress: undefined,
+      });
+      setServerUpdates([]);
+      console.log("[SESSION] All session data cleared");
+    }
+  };
+
+  const clearProcessingData = () => {
+    if (confirm("Clear stuck processing data? This will remove current processing images and progress but keep your completed results.")) {
+      // Clear processing data from session storage
+      sessionStorageManager.clearProcessingData();
+      
+      // Reset processing state
+      setImages([]);
+      setIsProcessing(false);
+      setProcessingAborted(false);
+      setIsStopping(false);
+      setSessionId("");
+      setProgressData({
+        total: 0,
+        completed: 0,
+        processing: 0,
+        status: "",
+        currentItem: null,
+        midjourneyProgress: undefined,
+      });
+      setServerUpdates([]);
+      
+      // Close any existing SSE connections
+      if (eventSource) {
+        eventSource.close();
+        setEventSource(null);
+      }
+      
+      console.log("[SESSION] Processing data cleared, completed results preserved");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Animated background */}
@@ -554,6 +667,16 @@ export default function Home() {
                         <span className="sm:hidden">Download</span>
                       </button>
                     )}
+                    <button
+                      onClick={clearSessionData}
+                      className="flex items-center space-x-2 px-3 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl hover:from-red-500 hover:to-red-400 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base"
+                      title="Clear all session data including completed results"
+                    >
+                      <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      <span className="hidden sm:inline">Clear</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -626,7 +749,7 @@ export default function Home() {
                               : "Texture"}
                           </span>
                           <span className="text-xs sm:text-sm text-gray-300">
-                            {formatFileSize(image.file.size)}
+                            {formatFileSize(image.fileSize || image.file?.size)}
                           </span>
                         </div>
                         {image.error && (
@@ -748,6 +871,7 @@ export default function Home() {
             progressData={progressData}
             serverUpdates={serverUpdates}
             isStopping={isStopping}
+            onClearProcessing={clearProcessingData}
           />
         </div>
       </main>

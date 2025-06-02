@@ -123,7 +123,7 @@ export default function CompletedResultsModal({
                             ? image.customClothingPart 
                             : image.clothingPart}
                         </span>
-                        <span>{formatFileSize(image.file.size)}</span>
+                        <span>{formatFileSize(image.fileSize || image.file?.size)}</span>
                         {image.midjourneyPrompts && (
                           <span className="text-emerald-400 font-medium">
                             {image.midjourneyPrompts.length} prompts generated
