@@ -36,7 +36,8 @@ export default function ServerUpdatesModal({
   };
 
   const expandAll = () => {
-    const allKeys = serverUpdates.map((_, index) => `${serverUpdates[index].timestamp}-${index}`);
+    const reversedUpdates = serverUpdates.slice().reverse();
+    const allKeys = reversedUpdates.map((update, index) => `${update.timestamp}-${index}`);
     setExpandedItems(new Set(allKeys));
   };
 
@@ -131,7 +132,7 @@ export default function ServerUpdatesModal({
                   <p className="text-gray-400">No server updates yet</p>
                 </div>
               ) : (
-                serverUpdates.map((update, index) => {
+                serverUpdates.slice().reverse().map((update, index) => {
                   const isRecent = Date.now() - update.timestamp < 5000;
                   const updateKey = `${update.timestamp}-${index}`;
                   const isExpanded = expandedItems.has(updateKey);

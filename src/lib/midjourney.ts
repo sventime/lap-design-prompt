@@ -23,7 +23,7 @@ export const midjourneyClient = new Midjourney({
   ChannelId: process.env.DISCORD_CHANNEL_ID,
   SalaiToken: process.env.DISCORD_TOKEN,
   Debug: process.env.NODE_ENV === "development",
-  Ws: false,
+  Ws: true,
   HuggingFaceToken: undefined, // Explicitly set to undefined
 });
 
@@ -169,7 +169,7 @@ export async function sendPromptToMidjourney(
 
     onProgress?.("Sending prompt to Midjourney...");
     console.log(`[Midjourney] Sending prompt: ${finalPrompt}`);
-    
+
     // Add 4-minute timeout for Midjourney response (Discord anti-bot protection)
     const imaginePromise = midjourneyClient.Imagine(finalPrompt);
     const imagineTimeoutPromise = new Promise((_, reject) =>
@@ -246,7 +246,12 @@ export async function sendPromptToMidjourney(
 export async function sendMultiplePromptsToMidjourney(
   prompts: string[],
   imageBase64?: string,
-  onProgress?: (promptIndex: number, total: number, status: string, details?: any) => void,
+  onProgress?: (
+    promptIndex: number,
+    total: number,
+    status: string,
+    details?: any
+  ) => void,
   sessionId?: string
 ): Promise<{
   success: boolean;
@@ -349,10 +354,15 @@ export async function sendMultiplePromptsToMidjourney(
         onProgress?.(
           i + 1,
           prompts.length,
-          `Waiting for Midjourney response (up to 4 minutes)... (${i + 1}/${prompts.length})`
+          `Waiting for Midjourney response (up to 4 minutes)... (${i + 1}/${
+            prompts.length
+          })`
         );
 
-        const message = await Promise.race([imaginePromise, imagineTimeoutPromise]);
+        const message = await Promise.race([
+          imaginePromise,
+          imagineTimeoutPromise,
+        ]);
 
         if (message) {
           results.push({
@@ -391,12 +401,15 @@ export async function sendMultiplePromptsToMidjourney(
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
         console.error(`[Midjourney] Error sending prompt "${prompt}":`, error);
-        
+
         // Check if this is a timeout error and provide specific guidance
         if (errorMessage === "MIDJOURNEY_TIMEOUT") {
-          console.error(`[Midjourney] ⏰ Timeout on prompt ${i + 1}/${prompts.length}`);
+          console.error(
+            `[Midjourney] ⏰ Timeout on prompt ${i + 1}/${prompts.length}`
+          );
           onProgress?.(
             i + 1,
             prompts.length,
@@ -405,27 +418,31 @@ export async function sendMultiplePromptsToMidjourney(
               promptIndex: i + 1,
               totalPrompts: prompts.length,
               failedPrompt: prompt,
-              error: "Midjourney response timeout - possible Discord anti-bot check",
-              errorType: 'midjourney_timeout',
-              timeoutDuration: '4 minutes',
-              recoveryInstructions: 'Go to Discord and manually run /imagine to pass anti-bot verification, then restart processing'
+              error:
+                "Midjourney response timeout - possible Discord anti-bot check",
+              errorType: "midjourney_timeout",
+              timeoutDuration: "4 minutes",
+              recoveryInstructions:
+                "Go to Discord and manually run /imagine to pass anti-bot verification, then restart processing",
             }
           );
         } else {
           onProgress?.(
             i + 1,
             prompts.length,
-            `Prompt ${i + 1}/${prompts.length} failed with error: ${errorMessage}`,
+            `Prompt ${i + 1}/${
+              prompts.length
+            } failed with error: ${errorMessage}`,
             {
               promptIndex: i + 1,
               totalPrompts: prompts.length,
               failedPrompt: prompt,
               error: errorMessage,
-              errorType: 'midjourney_prompt_failed'
+              errorType: "midjourney_prompt_failed",
             }
           );
         }
-        
+
         results.push({
           prompt,
           error: errorMessage,

@@ -434,7 +434,7 @@ export default function ProcessingProgress({
             <div className="overflow-hidden">
               <table className="w-full">
                 <tbody className="divide-y divide-gray-700/30">
-                  {serverUpdates.slice(0, 3).map((update, index) => {
+                  {serverUpdates.slice().reverse().slice(0, 3).map((update, index) => {
                     const isError = update.type.includes('failed') || update.type.includes('error') || 
                                    (update.details?.errorType && update.details.errorType.includes('failed'));
                     const isTimeout = update.details?.errorType === 'midjourney_timeout';
