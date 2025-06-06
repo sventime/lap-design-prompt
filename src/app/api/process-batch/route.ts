@@ -18,10 +18,11 @@ interface BatchItem {
 
 export async function POST(request: NextRequest) {
   try {
-    const { items, sessionId, sendToMidjourney = true } = await request.json() as { 
+    const { items, sessionId, sendToMidjourney = true, fastMode = false } = await request.json() as { 
       items: BatchItem[], 
       sessionId?: string,
-      sendToMidjourney?: boolean 
+      sendToMidjourney?: boolean,
+      fastMode?: boolean 
     };
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -140,7 +141,8 @@ export async function POST(request: NextRequest) {
             }
           },
           sessionId, // Pass sessionId for abort checking
-          item.fileName // Pass fileName for MIME type detection
+          item.fileName, // Pass fileName for MIME type detection
+          fastMode // Pass fastMode for --fast flag
         );
 
         const itemResult = {

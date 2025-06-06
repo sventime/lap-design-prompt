@@ -19,6 +19,7 @@ export default function Home() {
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
   const [sendToMidjourney, setSendToMidjourney] = useState(true);
+  const [fastMode, setFastMode] = useState(false);
 
   // Initialize state from session storage or defaults
   const [images, setImages] = useState<UploadedImage[]>([]);
@@ -438,6 +439,7 @@ export default function Home() {
           items: batchItems,
           sessionId: newSessionId,
           sendToMidjourney: sendToMidjourney,
+          fastMode: fastMode,
         }),
       });
 
@@ -822,15 +824,26 @@ export default function Home() {
           {/* Action Buttons */}
           {images.length > 0 && (
             <div className="space-y-4">
-              {/* Processing Mode Toggle */}
+              {/* Midjourney Configuration Form */}
               <div className="flex items-center justify-center">
-                <div className="glass rounded-xl px-6 py-4 border border-gray-700/50">
-                  <div className="flex items-center space-x-4">
-                    <div className="text-sm text-gray-300 font-medium">
-                      Processing Mode:
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="relative">
+                <div className="glass rounded-xl px-6 py-5 border border-gray-700/50 max-w-md w-full">
+                  <div className="text-center mb-4">
+                    <h3 className="text-lg font-semibold text-white mb-1">Midjourney Settings</h3>
+                    <p className="text-xs text-gray-400">Configure your generation preferences</p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* Send to Midjourney Toggle */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <label className="text-sm text-gray-300 font-medium">Send to Midjourney</label>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {sendToMidjourney 
+                            ? 'Generate & automatically send to Discord' 
+                            : 'Generate prompts only (no sending)'}
+                        </p>
+                      </div>
+                      <div className="ml-4">
                         <button
                           onClick={() => setSendToMidjourney(!sendToMidjourney)}
                           className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
@@ -844,15 +857,33 @@ export default function Home() {
                           />
                         </button>
                       </div>
-                      <div className="text-sm text-gray-300 font-medium min-w-[120px]">
-                        {sendToMidjourney ? 'Send to Midjourney' : 'Prompts Only'}
+                    </div>
+
+                    {/* Fast Mode Toggle - always show */}
+                    <div className="flex items-center justify-between border-t border-gray-700/30 pt-4">
+                      <div className="flex-1">
+                        <label className="text-sm text-gray-300 font-medium">Fast Mode</label>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {fastMode 
+                            ? 'Add --fast to generated prompts' 
+                            : 'Generate prompts without --fast flag'}
+                        </p>
+                      </div>
+                      <div className="ml-4">
+                        <button
+                          onClick={() => setFastMode(!fastMode)}
+                          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                            fastMode ? 'bg-purple-600' : 'bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                              fastMode ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-400 text-center">
-                    {sendToMidjourney 
-                      ? 'Generate prompts and automatically send to Midjourney' 
-                      : 'Generate prompts only (no Midjourney sending)'}
                   </div>
                 </div>
               </div>

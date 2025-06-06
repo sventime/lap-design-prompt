@@ -55,7 +55,8 @@ export async function generateMidjourneyPrompt(
     details?: any
   ) => void,
   sessionId?: string,
-  fileName?: string
+  fileName?: string,
+  fastMode: boolean = false
 ): Promise<{
   prompt: string;
   midjourneyPrompts: string[];
@@ -117,15 +118,15 @@ Requirements:
 - Show detailed view of design and fit
 - Professional fashion photography style
 - Always add "on contrasting background" to highlight the ${clothingPart}
-- Use parameters like --ar 2:3 --q 2 --s 250 --fast
+- Use parameters like --ar 2:3 --q 2 --s 250
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
 - DO NOT use markdown formatting (no **, -, or other markdown)
 - DO NOT wrap prompts in quotation marks
-- Format: PROMPT1: [full prompt description] --ar 2:3 --q 2 --s 250 --fast
-- Format: PROMPT2: [full prompt description] --ar 2:3 --q 2 --s 250 --fast
-- Format: PROMPT3: [full prompt description] --ar 2:3 --q 2 --s 250 --fast
+- Format: PROMPT1: [full prompt description] --ar 2:3 --q 2 --s 250
+- Format: PROMPT2: [full prompt description] --ar 2:3 --q 2 --s 250
+- Format: PROMPT3: [full prompt description] --ar 2:3 --q 2 --s 250
 - Use plain text only, no bold or bullet points, no quotation marks
 
 Also create 10 product names:
@@ -142,21 +143,21 @@ Requirements:
 - Use macro photography perspective
 - Add lighting that shows texture depth
 - Force Midjourney to generate exatrly a texture, not an outfit or even zoomed-in part of it, but texture that I can apply on 3d model
-- Use --ar 1:1 --q 2 --fast
+- Use --ar 1:1 --q 2
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
 - DO NOT use markdown formatting (no **, -, or other markdown)
 - DO NOT wrap prompts in quotation marks
-- Format: PROMPT1: [fabric type] fabric texture, [material properties], macro photography --ar 1:1 --q 2 --fast
-- Format: PROMPT2: [fabric type] fabric texture, [material properties], macro photography --ar 1:1 --q 2 --fast
-- Format: PROMPT3: [fabric type] fabric texture,  [material properties], macro photography --ar 1:1 --q 2 --fast
+- Format: PROMPT1: [fabric type] fabric texture, [material properties], macro photography --ar 1:1 --q 2
+- Format: PROMPT2: [fabric type] fabric texture, [material properties], macro photography --ar 1:1 --q 2
+- Format: PROMPT3: [fabric type] fabric texture,  [material properties], macro photography --ar 1:1 --q 2
 - Use plain text only, no bold or bullet points, no quotation marks
 
 Examples of good fabric texture prompts:
-- Cotton denim fabric texture, diagonal twill weave, indigo blue threads, raw selvedge edge, macro photography --ar 1:1 --q 2 --fast
-- Wool herringbone fabric texture, chevron weave pattern, charcoal gray fibers, soft hand feel, macro photography --ar 1:1 --q 2 --fast
-- Silk charmeuse fabric texture, satin weave, lustrous surface, fluid drape, ivory color, macro photography --ar 1:1 --q 2 --fast
+- Cotton denim fabric texture, diagonal twill weave, indigo blue threads, raw selvedge edge, macro photography --ar 1:1 --q 2
+- Wool herringbone fabric texture, chevron weave pattern, charcoal gray fibers, soft hand feel, macro photography --ar 1:1 --q 2
+- Silk charmeuse fabric texture, satin weave, lustrous surface, fluid drape, ivory color, macro photography --ar 1:1 --q 2
 `
 }
 
@@ -281,11 +282,18 @@ Do not include /imagine command.`,
         .slice(0, 10);
     }
 
+    // Prepare prompts for UI display - add --fast if fastMode is enabled
+    const displayPrompts = fastMode 
+      ? prompts.slice(0, 3).map(prompt => `${prompt} --fast`)
+      : prompts.slice(0, 3);
+
     const result = {
       prompt: content,
-      midjourneyPrompts: prompts.slice(0, 3),
+      midjourneyPrompts: displayPrompts,
       outfitNames: promptType === "outfit" ? outfitNames : undefined,
     };
+
+    console.log(`[OpenAI] Fast mode ${fastMode ? 'enabled' : 'disabled'} - generated ${displayPrompts.length} prompts for UI display`);
 
     // Auto-send to Midjourney if requested
     if (autoSendToMidjourney && result.midjourneyPrompts.length > 0) {
@@ -298,6 +306,13 @@ Do not include /imagine command.`,
         const { sendMultiplePromptsToMidjourney } = await import(
           "./midjourney"
         );
+        
+        // Use the display prompts (which already have --fast if fastMode is enabled)
+        console.log(`[OpenAI] Fast mode ${fastMode ? 'enabled' : 'disabled'} - sending ${result.midjourneyPrompts.length} prompts to Midjourney`);
+        if (fastMode) {
+          console.log(`[OpenAI] Prompts include --fast flag for faster generation`);
+        }
+        
         const midjourneyResult = await sendMultiplePromptsToMidjourney(
           result.midjourneyPrompts,
           imageBase64,
