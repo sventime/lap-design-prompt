@@ -124,8 +124,13 @@ export default function DiscordTokenInput({
               <div className="text-sm text-blue-300 space-y-2">
                 <p className="font-medium">How to get your Discord token:</p>
                 <ol className="list-decimal list-inside space-y-1 text-xs">
-                  <li>Open Discord in your web browser</li>
-                  <li>Press F12 to open Developer Tools</li>
+                  <li>Open Discord in your web browser: <a href="https://discord.com/app" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">https://discord.com/app</a></li>
+                  <li>Open Developer Tools:
+                    <ul className="list-disc list-inside ml-4 mt-1 space-y-0.5">
+                      <li><strong>Windows:</strong> F12 or Ctrl+Shift+I</li>
+                      <li><strong>Mac:</strong> F12 or Cmd+Option+I</li>
+                    </ul>
+                  </li>
                   <li>Go to the "Network" tab</li>
                   <li>Refresh the page or send a message</li>
                   <li>Look for any request to "discord.com/api"</li>
