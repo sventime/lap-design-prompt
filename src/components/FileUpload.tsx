@@ -19,6 +19,10 @@ const CLOTHING_PARTS: { value: ClothingPart; label: string }[] = [
   { value: 'accessories', label: 'Accessories' },
   { value: 'hair', label: 'Hair' },
   { value: 'features', label: 'Features' },
+  { value: 'outfit', label: 'Outfit' },
+  { value: 'jumpsuit', label: 'Jumpsuit' },
+  { value: 'bag', label: 'Bag' },
+  { value: 'necklace', label: 'Necklace' },
   { value: 'other', label: 'Other (Custom)' },
 ];
 

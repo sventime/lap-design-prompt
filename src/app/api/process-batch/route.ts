@@ -18,11 +18,16 @@ interface BatchItem {
 
 export async function POST(request: NextRequest) {
   try {
-    const { items, sessionId, sendToMidjourney = true, fastMode = false } = await request.json() as { 
+    const { items, sessionId, sendToMidjourney = true, fastMode = false, discordCredentials } = await request.json() as { 
       items: BatchItem[], 
       sessionId?: string,
       sendToMidjourney?: boolean,
-      fastMode?: boolean 
+      fastMode?: boolean,
+      discordCredentials?: {
+        discordToken?: string;
+        discordServerId?: string;
+        discordChannelId?: string;
+      }
     };
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -142,7 +147,8 @@ export async function POST(request: NextRequest) {
           },
           sessionId, // Pass sessionId for abort checking
           item.fileName, // Pass fileName for MIME type detection
-          fastMode // Pass fastMode for --fast flag
+          fastMode, // Pass fastMode for --fast flag
+          discordCredentials // Pass Discord credentials for token override
         );
 
         const itemResult = {
@@ -180,13 +186,14 @@ export async function POST(request: NextRequest) {
 
         // Send progress update for failed item
         if (sessionId) {
+          console.log(`[Batch] Sending item_failed update for item ${item.id}:`, itemResult);
           sendProgressUpdate(sessionId, {
             type: 'item_failed',
             total: items.length,
             completed: i + 1,
             processing: 0,
             itemResult,
-            status: `Failed to process image ${i + 1} of ${items.length}`
+            status: `Failed to process image ${i + 1} of ${items.length}: ${itemResult.error}`
           });
         }
       }
@@ -199,15 +206,18 @@ export async function POST(request: NextRequest) {
 
     // Send final completion update
     if (sessionId) {
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
+      console.log(`[Batch] Sending batch_completed update: ${successCount} succeeded, ${errorCount} failed`);
       sendProgressUpdate(sessionId, {
         type: 'batch_completed',
         total: items.length,
         completed: items.length,
         processing: 0,
         results,
-        successCount: results.filter(r => r.success).length,
-        errorCount: results.filter(r => !r.success).length,
-        status: 'Batch processing completed!'
+        successCount,
+        errorCount,
+        status: `Batch processing completed! ${successCount} succeeded, ${errorCount} failed`
       });
     }
 

@@ -3,7 +3,7 @@ import { sendMultiplePromptsToMidjourney } from '@/lib/midjourney';
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompts } = await request.json();
+    const { prompts, discordToken, discordServerId, discordChannelId } = await request.json();
 
     if (!prompts || !Array.isArray(prompts) || prompts.length === 0) {
       return NextResponse.json(
@@ -14,7 +14,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`[API] Sending ${prompts.length} prompts to Midjourney`);
 
-    const result = await sendMultiplePromptsToMidjourney(prompts);
+    const result = await sendMultiplePromptsToMidjourney(prompts, {
+      discordToken,
+      discordServerId,
+      discordChannelId,
+    });
 
     return NextResponse.json({
       success: result.success,

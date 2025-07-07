@@ -6,6 +6,7 @@ import FileUpload from "@/components/FileUpload";
 import ProcessingProgress from "@/components/ProcessingProgress";
 import ResultsModal from "@/components/ResultsModal";
 import CompletedResultsModal from "@/components/CompletedResultsModal";
+import DiscordTokenInput from "@/components/DiscordTokenInput";
 import { UploadedImage, formatFileSize } from "@/types";
 import { getVersionDisplay } from "@/lib/version";
 import { sessionStorageManager } from "@/lib/sessionStorage";
@@ -20,6 +21,14 @@ export default function Home() {
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
   const [sendToMidjourney, setSendToMidjourney] = useState(true);
   const [fastMode, setFastMode] = useState(false);
+  const [discordUser, setDiscordUser] = useState<{
+    id: string;
+    username: string;
+    avatar: string;
+    accessToken: string;
+  } | null>(null);
+  const [userToken, setUserToken] = useState("");
+  const [showTokenInput, setShowTokenInput] = useState(false);
 
   // Initialize state from session storage or defaults
   const [images, setImages] = useState<UploadedImage[]>([]);
@@ -37,15 +46,64 @@ export default function Home() {
     currentItem: null as any,
     midjourneyProgress: undefined as any,
   });
-  const [serverUpdates, setServerUpdates] = useState<Array<{
-    timestamp: number;
-    type: string;
-    message: string;
-    details?: any;
-  }>>([]);
+  const [serverUpdates, setServerUpdates] = useState<
+    Array<{
+      timestamp: number;
+      type: string;
+      message: string;
+      details?: any;
+    }>
+  >([]);
 
-  // Restore state from session storage on mount
+  // Restore Discord user from localStorage and state from session storage on mount
   useEffect(() => {
+    const storedDiscordUser = localStorage.getItem("discordUser");
+    const storedUserToken = localStorage.getItem("discordUserToken");
+    
+    if (storedDiscordUser) {
+      try {
+        setDiscordUser(JSON.parse(storedDiscordUser));
+      } catch (error) {
+        console.error("Error parsing stored Discord user:", error);
+        localStorage.removeItem("discordUser");
+      }
+    }
+    
+    if (storedUserToken) {
+      setUserToken(storedUserToken);
+      console.log("Found stored Discord user token");
+    } else if (storedDiscordUser) {
+      // If user is already logged in but no token stored, show token input
+      setShowTokenInput(true);
+    }
+
+    // Handle Discord OAuth success/error from callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const discordSuccess = urlParams.get("discord_success");
+    const discordError = urlParams.get("discord_error");
+
+    if (discordSuccess) {
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // User data should already be in localStorage from callback
+      const freshUser = localStorage.getItem("discordUser");
+      if (freshUser) {
+        setDiscordUser(JSON.parse(freshUser));
+        // Always show token input after fresh login unless token already exists
+        const storedToken = localStorage.getItem("discordUserToken");
+        if (!storedToken) {
+          setShowTokenInput(true);
+        }
+      }
+    }
+
+    if (discordError) {
+      console.error("Discord OAuth error:", discordError);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Show error to user if needed
+    }
+
     const restoredState = sessionStorageManager.restoreState();
     setImages(restoredState.images);
     setCompletedImages(restoredState.completedImages);
@@ -59,10 +117,49 @@ export default function Home() {
 
     // If we were processing when the page was reloaded, try to reconnect to SSE
     if (restoredState.isProcessing && restoredState.sessionId) {
-      console.log('[SESSION] Restored processing session, reconnecting to SSE:', restoredState.sessionId);
+      console.log(
+        "[SESSION] Restored processing session, reconnecting to SSE:",
+        restoredState.sessionId
+      );
       setupSSEConnection(restoredState.sessionId);
     }
   }, []);
+
+  // Discord OAuth functions
+  const handleDiscordLogin = () => {
+    const clientId =
+      process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || "1234567890123456789";
+    const redirectUri = encodeURIComponent(
+      window.location.origin + "/auth/discord/callback"
+    );
+    const scope = encodeURIComponent("identify");
+
+    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+    window.location.href = discordAuthUrl;
+  };
+
+  const handleDiscordLogout = () => {
+    localStorage.removeItem("discordUser");
+    localStorage.removeItem("discordUserToken");
+    setDiscordUser(null);
+    setUserToken("");
+    setShowTokenInput(false);
+  };
+
+  const handleTokenSubmit = (token: string) => {
+    setUserToken(token);
+    setShowTokenInput(false);
+    console.log("Discord user token saved and ready");
+  };
+
+  const handleSkipToken = () => {
+    setUserToken("disabled");
+    setShowTokenInput(false);
+  };
+
+  const handleRequestToken = () => {
+    setShowTokenInput(true);
+  };
 
   // Save state to session storage whenever important state changes
   useEffect(() => {
@@ -75,11 +172,22 @@ export default function Home() {
       processingAborted,
       isStopping
     );
-  }, [images, isProcessing, sessionId, progressData, serverUpdates, processingAborted, isStopping]);
+  }, [
+    images,
+    isProcessing,
+    sessionId,
+    progressData,
+    serverUpdates,
+    processingAborted,
+    isStopping,
+  ]);
 
   // Save completed results separately
   useEffect(() => {
-    sessionStorageManager.saveCompletedResults(completedImages, completedIdCounter);
+    sessionStorageManager.saveCompletedResults(
+      completedImages,
+      completedIdCounter
+    );
   }, [completedImages, completedIdCounter]);
 
   // Cleanup session storage and event source on unmount
@@ -106,13 +214,16 @@ export default function Home() {
         console.log("[SSE] Received message:", data);
 
         // Add all server updates to the log (except pings)
-        if (data.type !== 'ping' && data.type !== 'connected') {
-          setServerUpdates(prev => [...prev, {
-            timestamp: data.timestamp || Date.now(),
-            type: data.type,
-            message: data.status || `${data.type.replace('_', ' ')} event`,
-            details: data.midjourneyProgress || data.currentItem
-          }]);
+        if (data.type !== "ping" && data.type !== "connected") {
+          setServerUpdates((prev) => [
+            ...prev,
+            {
+              timestamp: data.timestamp || Date.now(),
+              type: data.type,
+              message: data.status || `${data.type.replace("_", " ")} event`,
+              details: data.midjourneyProgress || data.currentItem,
+            },
+          ]);
         }
 
         switch (data.type) {
@@ -248,7 +359,11 @@ export default function Home() {
 
           case "batch_completed":
           case "batch_aborted":
-            console.log(`[SSE] Batch ${data.type === 'batch_aborted' ? 'aborted' : 'completed'} - cleaning up`);
+            console.log(
+              `[SSE] Batch ${
+                data.type === "batch_aborted" ? "aborted" : "completed"
+              } - cleaning up`
+            );
             setProgressData({
               total: data.total,
               completed: data.completed,
@@ -260,7 +375,7 @@ export default function Home() {
 
             // Mark processing as complete
             setIsProcessing(false);
-            
+
             // Reset abort and stopping flags
             setProcessingAborted(false);
             setIsStopping(false);
@@ -273,11 +388,16 @@ export default function Home() {
 
             // Clear processing session data (keep completed results)
             setTimeout(() => {
-              const currentCompleted = sessionStorageManager.load()?.completedImages || [];
-              const currentCounter = sessionStorageManager.load()?.completedIdCounter || 1;
+              const currentCompleted =
+                sessionStorageManager.load()?.completedImages || [];
+              const currentCounter =
+                sessionStorageManager.load()?.completedIdCounter || 1;
               sessionStorageManager.clear();
               // Restore only completed data
-              sessionStorageManager.saveCompletedResults(currentCompleted, currentCounter);
+              sessionStorageManager.saveCompletedResults(
+                currentCompleted,
+                currentCounter
+              );
             }, 2000);
 
             // Smooth scroll to top when all images are processed
@@ -327,33 +447,40 @@ export default function Home() {
     console.log("[STOP] User requested to stop processing");
     setIsStopping(true);
     setProcessingAborted(true);
-    
+
     // Send abort signal to server
     if (sessionId) {
-      fetch('/api/abort-processing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId })
-      }).catch(err => console.warn('[STOP] Failed to notify server:', err));
+      fetch("/api/abort-processing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      }).catch((err) => console.warn("[STOP] Failed to notify server:", err));
     }
-    
+
     // Update progress to show stopping status
-    setProgressData(prev => ({
+    setProgressData((prev) => ({
       ...prev,
-      status: "Stopping processing... Waiting for current Discord image generation to complete",
-      midjourneyProgress: prev.midjourneyProgress ? {
-        ...prev.midjourneyProgress,
-        status: "Stopping after current prompt completes..."
-      } : undefined
+      status:
+        "Stopping processing... Waiting for current Discord image generation to complete",
+      midjourneyProgress: prev.midjourneyProgress
+        ? {
+            ...prev.midjourneyProgress,
+            status: "Stopping after current prompt completes...",
+          }
+        : undefined,
     }));
-    
+
     // Add stop message to server updates
-    setServerUpdates(prev => [...prev, {
-      timestamp: Date.now(),
-      type: 'processing_stopping',
-      message: 'Stop requested - waiting for current Discord image generation to complete',
-      details: { sessionId }
-    }]);
+    setServerUpdates((prev) => [
+      ...prev,
+      {
+        timestamp: Date.now(),
+        type: "processing_stopping",
+        message:
+          "Stop requested - waiting for current Discord image generation to complete",
+        details: { sessionId },
+      },
+    ]);
   };
 
   const handleProcessAll = async () => {
@@ -388,11 +515,13 @@ export default function Home() {
       total: images.length,
       completed: 0,
       processing: 0,
-      status: `Starting batch processing${sendToMidjourney ? ' with Midjourney' : ' (prompts only)'}...`,
+      status: `Starting batch processing${
+        sendToMidjourney ? " with Midjourney" : " (prompts only)"
+      }...`,
       currentItem: null,
       midjourneyProgress: undefined,
     });
-    
+
     // Clear previous server updates
     setServerUpdates([]);
 
@@ -440,6 +569,11 @@ export default function Home() {
           sessionId: newSessionId,
           sendToMidjourney: sendToMidjourney,
           fastMode: fastMode,
+          discordCredentials: userToken && userToken !== "disabled" ? {
+            discordToken: userToken,
+            discordServerId: undefined,
+            discordChannelId: undefined,
+          } : undefined,
         }),
       });
 
@@ -509,7 +643,11 @@ export default function Home() {
   };
 
   const clearSessionData = () => {
-    if (confirm("Are you sure you want to clear all session data? This will remove all completed results and processing history.")) {
+    if (
+      confirm(
+        "Are you sure you want to clear all session data? This will remove all completed results and processing history."
+      )
+    ) {
       sessionStorageManager.clear();
       setImages([]);
       setCompletedImages([]);
@@ -532,10 +670,14 @@ export default function Home() {
   };
 
   const clearProcessingData = () => {
-    if (confirm("Clear stuck processing data? This will remove current processing images and progress but keep your completed results.")) {
+    if (
+      confirm(
+        "Clear stuck processing data? This will remove current processing images and progress but keep your completed results."
+      )
+    ) {
       // Clear processing data from session storage
       sessionStorageManager.clearProcessingData();
-      
+
       // Reset processing state
       setImages([]);
       setIsProcessing(false);
@@ -551,14 +693,16 @@ export default function Home() {
         midjourneyProgress: undefined,
       });
       setServerUpdates([]);
-      
+
       // Close any existing SSE connections
       if (eventSource) {
         eventSource.close();
         setEventSource(null);
       }
-      
-      console.log("[SESSION] Processing data cleared, completed results preserved");
+
+      console.log(
+        "[SESSION] Processing data cleared, completed results preserved"
+      );
     }
   };
 
@@ -593,17 +737,38 @@ export default function Home() {
                   <span>•</span>
                   <span className="hidden md:inline">{buildTime}</span>
                 </div>
-                {/* Mobile version info */}
                 <div className="sm:hidden text-xs text-gray-400 font-medium truncate">
                   AI Powered • v{version}
                 </div>
               </div>
             </div>
             <div className="flex items-center space-x-3 flex-shrink-0 ml-2 sm:ml-4">
-              <div className="text-xs sm:text-sm text-indigo-300 font-medium px-2 sm:px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20">
-                <span className="hidden sm:inline">Pinterest → AI</span>
-                <span className="sm:hidden">AI</span>
-              </div>
+              {discordUser && (
+                <div className="flex items-center space-x-2">
+                  <img
+                    src={`https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png?size=32`}
+                    alt={discordUser.username}
+                    className="w-6 h-6 sm:w-8 sm:h-8 rounded-full"
+                  />
+                  <span className="text-xs sm:text-sm text-white font-medium">
+                    {discordUser.username}
+                  </span>
+                  {userToken === "disabled" && (
+                    <button
+                      onClick={handleRequestToken}
+                      className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                    >
+                      Add Token
+                    </button>
+                  )}
+                  <button
+                    onClick={handleDiscordLogout}
+                    className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -611,342 +776,236 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-12">
-          {/* Hero Section */}
-          <div className="text-center space-y-6">
-            <div className="space-y-4">
-              <h2 className="text-4xl leading-[2] md:text-5xl font-bold bg-gradient-to-r from-white via-indigo-200 to-purple-200 bg-clip-text text-transparent">
-                Automate Your Fashion Design Process
-              </h2>
-              <div className="h-1 w-32 bg-gradient-to-r from-indigo-500 to-purple-500 mx-auto rounded-full"></div>
-            </div>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
-              Upload Pinterest images, select clothing parts, and get 3 detailed
-              Midjourney prompts for each design. Perfect for 3D clothing
-              visualization and fashion prototyping.
-            </p>
-          </div>
-
-          {/* Completed Results Section */}
-          {completedImages.length > 0 && (
-            <div className="glass rounded-2xl border border-emerald-700/50 overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-emerald-700/50 bg-emerald-500/5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
-                  <div>
-                    <h3 className="text-lg sm:text-2xl font-bold text-emerald-300">
-                      Completed Results
-                    </h3>
-                    <p className="text-xs sm:text-sm text-emerald-400/80 mt-1">
-                      {
-                        completedImages.filter(
-                          (img) => img.status === "completed"
-                        ).length
-                      }{" "}
-                      successful •{" "}
-                      {
-                        completedImages.filter((img) => img.status === "error")
-                          .length
-                      }{" "}
-                      failed
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    <button
-                      onClick={() => setShowCompletedModal(true)}
-                      className="flex items-center space-x-2 px-3 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base"
+        {!discordUser ? (
+          // Step 1: Discord OAuth Login Screen
+          <div className="min-h-[70vh] flex items-center justify-center">
+            <div className="glass rounded-3xl border border-gray-700/50 p-12 text-center max-w-md mx-auto">
+              <div className="space-y-6">
+                
+                <div className="relative">
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl">
+                    <svg
+                      className="w-10 h-10 text-white"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <List className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="hidden sm:inline">View All</span>
-                      <span className="sm:hidden">All</span>
-                    </button>
-                    {completedImages.some(
-                      (img) => img.status === "completed"
-                    ) && (
-                      <button
-                        onClick={downloadAllResults}
-                        className="flex items-center space-x-2 px-3 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-500 hover:to-teal-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base"
-                      >
-                        <Download className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="hidden sm:inline">Download All</span>
-                        <span className="sm:hidden">Download</span>
-                      </button>
-                    )}
-                    <button
-                      onClick={clearSessionData}
-                      className="flex items-center space-x-2 px-3 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl hover:from-red-500 hover:to-red-400 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base"
-                      title="Clear all session data including completed results"
-                    >
-                      <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      <span className="hidden sm:inline">Clear</span>
-                    </button>
+                      <path d="M20.317 4.369a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.211.375-.445.865-.608 1.249a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.249.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.369a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028 14.09 14.09 0 001.226-1.994.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                    </svg>
                   </div>
+                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full animate-pulse"></div>
                 </div>
-              </div>
-              <div className="divide-y divide-gray-700/30 max-h-96 overflow-y-auto">
-                {completedImages
-                  .sort((a, b) => {
-                    const aId = a.completedId || 0;
-                    const bId = b.completedId || 0;
-                    return bId - aId;
-                  })
-                  .map((image) => (
-                    <div
-                      key={`completed-${
-                        image.processingId || image.completedId || image.id
-                      }`}
-                      className="p-4 sm:p-6 flex items-center space-x-3 sm:space-x-6 hover:bg-gray-800/20 transition-colors"
-                    >
-                      {/* Image Thumbnail */}
-                      <div className="relative flex-shrink-0">
-                        <img
-                          src={image.preview}
-                          alt={image.file.name}
-                          className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-gray-700/50"
-                        />
-                        <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 to-transparent"></div>
-                      </div>
-
-                      {/* Image Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-1">
-                          <div className="text-sm sm:text-lg font-medium text-white">
-                            #{image.completedId}
-                          </div>
-                          <div className="text-xs sm:text-sm text-gray-400">
-                            {image.generatedAt
-                              ? image.generatedAt.toLocaleDateString() +
-                                " " +
-                                image.generatedAt.toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
-                              : ""}
-                          </div>
-                        </div>
-                        <div className="text-xs sm:text-sm text-gray-300 truncate mb-2">
-                          {image.file.name}
-                        </div>
-                        {image.genderType && (
-                          <div className="text-xs text-gray-400 mb-1">
-                            {image.genderType} • {image.promptType}
-                            {image.guidance && ` • "${image.guidance}"`}
-                          </div>
-                        )}
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <span className="text-xs sm:text-sm text-gray-300">
-                            {image.clothingPart === "other" &&
-                            image.customClothingPart
-                              ? image.customClothingPart
-                              : image.clothingPart}
-                          </span>
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium border ${
-                              image.promptType === "outfit"
-                                ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
-                                : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                            }`}
-                          >
-                            {image.promptType === "outfit"
-                              ? "Outfit"
-                              : "Texture"}
-                          </span>
-                          <span className="text-xs sm:text-sm text-gray-300">
-                            {formatFileSize(image.fileSize || image.file?.size)}
-                          </span>
-                        </div>
-                        {image.error && (
-                          <div className="text-xs sm:text-sm text-red-400 bg-red-500/10 px-3 py-1 rounded-lg border border-red-500/20">
-                            {image.error}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Status Icon */}
-                      <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-                        {image.status === "completed" && (
-                          <div className="flex items-center space-x-2 sm:space-x-3">
-                            <div className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400">
-                              <svg
-                                className="w-full h-full"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            </div>
-                            <button
-                              onClick={() => handleViewResults(image)}
-                              className="px-3 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-500 hover:to-purple-500 font-medium transition-all hover:scale-105 shadow-lg cursor-pointer text-xs sm:text-sm"
-                            >
-                              <span className="hidden sm:inline">View Results</span>
-                              <span className="sm:hidden">View</span>
-                            </button>
-                          </div>
-                        )}
-                        {image.status === "error" && (
-                          <div className="flex items-center space-x-1 sm:space-x-2">
-                            <div className="h-5 w-5 sm:h-6 sm:w-6 text-red-400">
-                              <svg
-                                className="w-full h-full"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            </div>
-                            <span className="text-xs sm:text-sm text-red-400 font-medium hidden sm:inline">
-                              Failed
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* File Upload Section */}
-          <div className="glass rounded-2xl border border-gray-700/50 p-8">
-            <FileUpload onFilesUpload={setImages} disabled={isProcessing} />
-          </div>
-
-          {/* Action Buttons */}
-          {images.length > 0 && (
-            <div className="space-y-4">
-              {/* Midjourney Configuration Form */}
-              <div className="flex items-center justify-center">
-                <div className="glass rounded-xl px-6 py-5 border border-gray-700/50 max-w-md w-full">
-                  <div className="text-center mb-4">
-                    <h3 className="text-lg font-semibold text-white mb-1">Midjourney Settings</h3>
-                    <p className="text-xs text-gray-400">Configure your generation preferences</p>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {/* Send to Midjourney Toggle */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <label className="text-sm text-gray-300 font-medium">Send to Midjourney</label>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {sendToMidjourney 
-                            ? 'Generate & automatically send to Discord' 
-                            : 'Generate prompts only (no sending)'}
-                        </p>
-                      </div>
-                      <div className="ml-4">
-                        <button
-                          onClick={() => setSendToMidjourney(!sendToMidjourney)}
-                          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-                            sendToMidjourney ? 'bg-indigo-600' : 'bg-gray-600'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                              sendToMidjourney ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Fast Mode Toggle - always show */}
-                    <div className="flex items-center justify-between border-t border-gray-700/30 pt-4">
-                      <div className="flex-1">
-                        <label className="text-sm text-gray-300 font-medium">Fast Mode</label>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {fastMode 
-                            ? 'Add --fast to generated prompts' 
-                            : 'Generate prompts without --fast flag'}
-                        </p>
-                      </div>
-                      <div className="ml-4">
-                        <button
-                          onClick={() => setFastMode(!fastMode)}
-                          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                            fastMode ? 'bg-purple-600' : 'bg-gray-600'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                              fastMode ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                
+                <div className="space-y-3">
+                  <h2 className="text-2xl font-bold text-white">Sign in with Discord</h2>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    Sign in with Discord to verify your identity and access the AI fashion design automation tool.
+                  </p>
                 </div>
-              </div>
-              
-              {/* Generate Button */}
-              <div className="flex items-center justify-center space-x-4">
+                
                 <button
-                  onClick={handleProcessAll}
-                  disabled={isProcessing || images.length === 0}
-                  className="group btn-premium flex items-center space-x-3 px-8 py-4 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl cursor-pointer"
+                  onClick={handleDiscordLogin}
+                  className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3"
                 >
-                  <Wand2
-                    className={`h-6 w-6 ${
-                      isProcessing ? "animate-spin" : "group-hover:rotate-12"
-                    } transition-transform`}
-                  />
-                  <span className="text-lg">
-                    {isProcessing
-                      ? (sendToMidjourney ? "Generating & Sending..." : "Generating Prompts...")
-                      : (sendToMidjourney 
-                          ? `Generate & Send ${images.length} Images` 
-                          : `Generate Prompts for ${images.length} Images`)}
-                  </span>
+                  <svg
+                    className="w-5 h-5"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M20.317 4.369a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.211.375-.445.865-.608 1.249a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.249.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.369a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028 14.09 14.09 0 001.226-1.994.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                  </svg>
+                  <span>Sign in with Discord</span>
                 </button>
                 
-                {/* Stop Processing Button */}
-                {isProcessing && (
-                  <button
-                    onClick={handleStopProcessing}
-                    disabled={isStopping}
-                    className={`group flex items-center space-x-3 px-6 py-4 rounded-xl font-semibold text-white shadow-2xl transition-all ${
-                      isStopping 
-                        ? 'bg-gradient-to-r from-orange-600 to-orange-500 cursor-not-allowed opacity-75' 
-                        : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 hover:scale-105 cursor-pointer'
-                    }`}
-                  >
-                    <div className="h-6 w-6 flex items-center justify-center">
-                      {isStopping ? (
-                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <div className="h-3 w-3 bg-white rounded-sm"></div>
-                      )}
-                    </div>
-                    <span className="text-lg">
-                      {isStopping ? 'Stopping...' : 'Stop Processing'}
-                    </span>
-                  </button>
-                )}
+                <div className="pt-4 border-t border-gray-700/50">
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Secure authentication via Discord OAuth. Your credentials are never stored locally.
+                  </p>
+                </div>
               </div>
             </div>
-          )}
-
-          {/* Processing Progress */}
-          <ProcessingProgress
-            images={images}
-            isProcessing={isProcessing}
-            onViewResults={handleViewResults}
-            progressData={progressData}
-            serverUpdates={serverUpdates}
-            isStopping={isStopping}
-            onClearProcessing={clearProcessingData}
+          </div>
+        ) : showTokenInput && discordUser ? (
+          // Manual token input screen
+          <DiscordTokenInput
+            discordUser={discordUser}
+            onTokenSubmit={handleTokenSubmit}
+            onSkip={handleSkipToken}
           />
-        </div>
+        ) : discordUser ? (
+          // Main App UI
+          <div className="space-y-12">
+            {/* Hero Section */}
+            <div className="text-center space-y-6">
+              <div className="space-y-4">
+                <h2 className="text-4xl leading-[2] md:text-5xl font-bold bg-gradient-to-r from-white via-indigo-200 to-purple-200 bg-clip-text text-transparent">
+                  Automate Your Fashion Design Process
+                </h2>
+                <div className="h-1 w-32 bg-gradient-to-r from-indigo-500 to-purple-500 mx-auto rounded-full"></div>
+              </div>
+              <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
+                Upload Pinterest images, select clothing parts, and get 3 detailed
+                Midjourney prompts for each design. Perfect for 3D clothing
+                visualization and fashion prototyping.
+              </p>
+            </div>
+
+            {/* File Upload Section */}
+            <div className="glass rounded-2xl border border-gray-700/50 p-8">
+              <FileUpload onFilesUpload={setImages} disabled={isProcessing} />
+            </div>
+
+            {/* Action Buttons */}
+            {images.length > 0 && (
+              <div className="space-y-4">
+                {/* Midjourney Configuration Form */}
+                <div className="flex items-center justify-center">
+                  <div className="glass rounded-xl px-6 py-5 border border-gray-700/50 max-w-md w-full">
+                    <div className="text-center mb-4">
+                      <h3 className="text-lg font-semibold text-white mb-1">
+                        Midjourney Settings
+                      </h3>
+                      <p className="text-xs text-gray-400">
+                        Configure your generation preferences
+                      </p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Send to Midjourney Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <label className="text-sm text-gray-300 font-medium">
+                            Send to Midjourney
+                          </label>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {sendToMidjourney
+                              ? userToken === "disabled" 
+                                ? "Generate prompts only (no Discord token)"
+                                : "Generate & automatically send to Discord"
+                              : "Generate prompts only (no sending)"}
+                          </p>
+                        </div>
+                        <div className="ml-4">
+                          <button
+                            onClick={() =>
+                              setSendToMidjourney(!sendToMidjourney)
+                            }
+                            disabled={userToken === "disabled"}
+                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                              sendToMidjourney && userToken !== "disabled" ? "bg-indigo-600" : "bg-gray-600"
+                            } ${userToken === "disabled" ? "opacity-50 cursor-not-allowed" : ""}`}
+                          >
+                            <span
+                              className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                                sendToMidjourney && userToken !== "disabled"
+                                  ? "translate-x-6"
+                                  : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Fast Mode Toggle */}
+                      <div className="flex items-center justify-between border-t border-gray-700/30 pt-4">
+                        <div className="flex-1">
+                          <label className="text-sm text-gray-300 font-medium">
+                            Fast Mode
+                          </label>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {fastMode
+                              ? "Add --fast to generated prompts"
+                              : "Generate prompts without --fast flag"}
+                          </p>
+                        </div>
+                        <div className="ml-4">
+                          <button
+                            onClick={() => setFastMode(!fastMode)}
+                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                              fastMode ? "bg-purple-600" : "bg-gray-600"
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                                fastMode ? "translate-x-6" : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Generate Button */}
+                <div className="flex items-center justify-center space-x-4">
+                  <button
+                    onClick={handleProcessAll}
+                    disabled={isProcessing || images.length === 0}
+                    className="group btn-premium flex items-center space-x-3 px-8 py-4 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl cursor-pointer"
+                  >
+                    <Wand2
+                      className={`h-6 w-6 ${
+                        isProcessing ? "animate-spin" : "group-hover:rotate-12"
+                      } transition-transform`}
+                    />
+                    <span className="text-lg">
+                      {isProcessing
+                        ? sendToMidjourney
+                          ? "Generating & Sending..."
+                          : "Generating Prompts..."
+                        : sendToMidjourney
+                        ? `Generate & Send ${images.length} Images`
+                        : `Generate Prompts for ${images.length} Images`}
+                    </span>
+                  </button>
+
+                  {/* Stop Processing Button */}
+                  {isProcessing && (
+                    <button
+                      onClick={handleStopProcessing}
+                      disabled={isStopping}
+                      className={`group flex items-center space-x-3 px-6 py-4 rounded-xl font-semibold text-white shadow-2xl transition-all ${
+                        isStopping
+                          ? "bg-gradient-to-r from-orange-600 to-orange-500 cursor-not-allowed opacity-75"
+                          : "bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 hover:scale-105 cursor-pointer"
+                      }`}
+                    >
+                      <div className="h-6 w-6 flex items-center justify-center">
+                        {isStopping ? (
+                          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <div className="h-3 w-3 bg-white rounded-sm"></div>
+                        )}
+                      </div>
+                      <span className="text-lg">
+                        {isStopping ? "Stopping..." : "Stop Processing"}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Processing Progress */}
+            <ProcessingProgress
+              images={images}
+              isProcessing={isProcessing}
+              onViewResults={handleViewResults}
+              progressData={progressData}
+              serverUpdates={serverUpdates}
+              isStopping={isStopping}
+              onClearProcessing={clearProcessingData}
+            />
+          </div>
+        ) : (
+          // Fallback state
+          <div className="min-h-[70vh] flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-white mb-4">Getting Started...</h2>
+              <p className="text-gray-300">Please complete Discord authentication to continue.</p>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Results Modal */}

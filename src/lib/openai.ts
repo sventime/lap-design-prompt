@@ -56,7 +56,12 @@ export async function generateMidjourneyPrompt(
   ) => void,
   sessionId?: string,
   fileName?: string,
-  fastMode: boolean = false
+  fastMode: boolean = false,
+  discordCredentials?: {
+    discordToken?: string;
+    discordServerId?: string;
+    discordChannelId?: string;
+  }
 ): Promise<{
   prompt: string;
   midjourneyPrompts: string[];
@@ -108,7 +113,7 @@ export async function generateMidjourneyPrompt(
           content: [
             {
               type: "text",
-              text: `You are a fashion design expert with advanced vision capabilities. You can see and analyze images perfectly. You will be provided with an image that you MUST visually analyze to create detailed Midjourney prompts for ${clothingPart}.
+              text: `You are a fashion design expert. Please analyze the provided image to help create detailed Midjourney prompts for ${clothingPart}.
 
 ${
   promptType === "outfit"
@@ -175,9 +180,24 @@ Do not include /imagine command.`,
       ],
     };
 
+    // Log request payload without image data to avoid console spam
+    const logPayload = {
+      ...requestPayload,
+      messages: requestPayload.messages.map(msg => ({
+        ...msg,
+        content: Array.isArray(msg.content) 
+          ? msg.content.map(item => 
+              item.type === 'image_url' 
+                ? { ...item, image_url: { url: '[IMAGE_DATA_OMITTED]' } }
+                : item
+            )
+          : msg.content
+      }))
+    };
+    
     console.log(
       `[OpenAI Request] Request payload:`,
-      JSON.stringify(requestPayload, null, 2)
+      JSON.stringify(logPayload, null, 2)
     );
 
     const startTime = Date.now();
@@ -242,6 +262,25 @@ Do not include /imagine command.`,
       content.substring(0, 500)
     );
 
+    // Check if OpenAI refused to analyze the image
+    const refusalKeywords = [
+      "I'm sorry, but I can't",
+      "I cannot provide",
+      "I'm unable to",
+      "I can't provide analysis",
+      "can't analyze",
+      "unable to analyze"
+    ];
+    
+    const isRefusal = refusalKeywords.some(keyword => 
+      content.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    if (isRefusal) {
+      console.warn(`[OpenAI] Content policy refusal detected:`, content);
+      throw new Error(`OpenAI refused to analyze the image: ${content.substring(0, 200)}...`);
+    }
+
     // Extract individual prompts from the response with bulletproof parsing
     const prompts = content
       .split("\n")
@@ -282,6 +321,14 @@ Do not include /imagine command.`,
         .slice(0, 10);
     }
 
+    // Validate that we extracted valid prompts
+    if (prompts.length === 0) {
+      console.warn(`[OpenAI] No valid prompts found in response. Content:`, content);
+      throw new Error(`No valid prompts could be extracted from OpenAI response. Response: ${content.substring(0, 300)}...`);
+    }
+
+    console.log(`[OpenAI] Successfully extracted ${prompts.length} prompts from response`);
+
     // Prepare prompts for UI display - add --fast if fastMode is enabled
     const displayPrompts = fastMode 
       ? prompts.slice(0, 3).map(prompt => `${prompt} --fast`)
@@ -315,6 +362,7 @@ Do not include /imagine command.`,
         
         const midjourneyResult = await sendMultiplePromptsToMidjourney(
           result.midjourneyPrompts,
+          discordCredentials,
           imageBase64,
           onMidjourneyProgress,
           sessionId
@@ -353,6 +401,10 @@ Do not include /imagine command.`,
     return result;
   } catch (error) {
     console.error("Error generating Midjourney prompt:", error);
+    // Preserve the original error message instead of making it generic
+    if (error instanceof Error) {
+      throw error;
+    }
     throw new Error("Failed to generate Midjourney prompt");
   }
 }

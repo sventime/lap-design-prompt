@@ -22,7 +22,7 @@ export interface UploadedImage {
   fileType?: string;
 }
 
-export type ClothingPart = 'top' | 'bottom' | 'shoes' | 'accessories' | 'dress' | 'outerwear' | 'hair' | 'features' | 'other';
+export type ClothingPart = 'top' | 'bottom' | 'shoes' | 'accessories' | 'dress' | 'outerwear' | 'hair' | 'features' | 'outfit' | 'jumpsuit' | 'bag' | 'necklace' | 'other';
 
 export type PromptType = 'outfit' | 'texture';
 
