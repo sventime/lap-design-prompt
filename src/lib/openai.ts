@@ -123,7 +123,7 @@ Requirements:
 - Show detailed view of design and fit
 - Professional fashion photography style
 - Always add "on contrasting background" to highlight the ${clothingPart}
-- Use parameters like --ar 2:3 --q 2 --s 250
+- Use parameters like --ar 2:3 --q 2 --s 250${guidance ? `\n- Additional guidance: ${guidance}` : ''}
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
@@ -148,7 +148,7 @@ Requirements:
 - Use macro photography perspective
 - Add lighting that shows texture depth
 - Force Midjourney to generate exatrly a texture, not an outfit or even zoomed-in part of it, but texture that I can apply on 3d model
-- Use --ar 1:1 --q 2
+- Use --ar 1:1 --q 2${guidance ? `\n- Additional guidance: ${guidance}` : ''}
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
