@@ -83,9 +83,8 @@ export default function ProcessingProgress({
     progressData,
   });
 
-  // Show component if we're processing OR if there's progress data OR if there are active images
-  if (!isProcessing && totalActiveImages === 0 && !progressData?.total)
-    return null;
+  // Always show the component to display the Current Processing Queue section
+  // (even when empty, it will show helpful text)
 
   return (
     <div
@@ -94,6 +93,7 @@ export default function ProcessingProgress({
       }`}
     >
       {/* Overall Progress */}
+      {(isProcessing || activeImages.length > 0) && (
       <div className="glass rounded-2xl border border-gray-700/50 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 space-y-2 sm:space-y-0">
           <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
@@ -283,18 +283,20 @@ export default function ProcessingProgress({
           </div>
         </div>
       </div>
+      )}
 
       {/* Active Processing Images */}
-      {totalActiveImages > 0 && (
-        <div className="glass rounded-2xl border border-gray-700/50 overflow-hidden">
-          <div className="p-4 sm:p-6 border-b border-gray-700/50">
-            <h4 className="text-lg sm:text-xl font-semibold text-white">
-              Current Processing Queue
-            </h4>
-            <p className="text-xs sm:text-sm text-gray-400 mt-1">
-              Images being processed or waiting to be processed
-            </p>
-          </div>
+      {(isProcessing || activeImages.length > 0) && (
+      <div className="glass rounded-2xl border border-gray-700/50 overflow-hidden">
+        <div className="p-4 sm:p-6 border-b border-gray-700/50">
+          <h4 className="text-lg sm:text-xl font-semibold text-white">
+            Current Processing Queue
+          </h4>
+          <p className="text-xs sm:text-sm text-gray-400 mt-1">
+            Images being processed or waiting to be processed
+          </p>
+        </div>
+        {activeImages.length > 0 ? (
           <div className="divide-y divide-gray-700/30 max-h-96 overflow-y-auto">
             {activeImages.map((image) => (
               <div
@@ -385,7 +387,20 @@ export default function ProcessingProgress({
               </div>
             ))}
           </div>
-        </div>
+        ) : (
+          <div className="p-8 text-center">
+            <div className="text-gray-400 mb-2">
+              <Clock className="h-12 w-12 mx-auto opacity-50" />
+            </div>
+            <p className="text-gray-400 text-sm">
+              No images in processing queue
+            </p>
+            <p className="text-gray-500 text-xs mt-1">
+              Upload images and start processing to see them here
+            </p>
+          </div>
+        )}
+      </div>
       )}
 
       {/* Server Updates Summary */}
@@ -434,7 +449,15 @@ export default function ProcessingProgress({
             <div className="overflow-hidden">
               <table className="w-full">
                 <tbody className="divide-y divide-gray-700/30">
-                  {serverUpdates.slice().reverse().slice(0, 3).map((update, index) => {
+                  {serverUpdates.slice().reverse()
+                    .filter(update => {
+                      // Hide intermediate OpenAI progress updates, only show the final one and errors
+                      if (update.type === 'openai_starting' || update.type === 'openai_requesting' || update.type === 'openai_response_received') {
+                        return false;
+                      }
+                      return true;
+                    })
+                    .slice(0, 3).map((update, index) => {
                     const isError = update.type.includes('failed') || update.type.includes('error') || 
                                    (update.details?.errorType && update.details.errorType.includes('failed'));
                     const isTimeout = update.details?.errorType === 'midjourney_timeout';
@@ -446,6 +469,12 @@ export default function ProcessingProgress({
                       midjourney_progress: "text-purple-400 bg-purple-500/10 border-purple-500/20",
                       midjourney_prompt_failed: "text-red-400 bg-red-500/10 border-red-500/20",
                       midjourney_timeout: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+                      openai_starting: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+                      openai_requesting: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+                      openai_response_received: "text-green-400 bg-green-500/10 border-green-500/20",
+                      openai_processing_complete: "text-green-400 bg-green-500/10 border-green-500/20",
+                      openai_refusal: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+                      openai_error: "text-red-400 bg-red-500/10 border-red-500/20",
                       item_completed: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
                       item_failed: "text-red-400 bg-red-500/10 border-red-500/20",
                       batch_completed: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",

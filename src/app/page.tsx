@@ -260,6 +260,56 @@ export default function Home() {
             });
             break;
 
+          case "openai_processing_complete":
+            console.log("[SSE] OpenAI processing complete:", data);
+            // Immediately move image to completed results when OpenAI finishes
+            if (data.details && data.details.id) {
+              setImages((prevImages) => {
+                const targetImage = prevImages.find(img => img.id === data.details.id);
+                if (!targetImage) return prevImages;
+
+                const updatedImage = {
+                  ...targetImage,
+                  status: "completed" as const,
+                  prompt: data.details.prompt,
+                  midjourneyPrompts: data.details.midjourneyPrompts,
+                  outfitNames: data.details.outfitNames,
+                };
+
+                console.log("[SSE] Moving image to completed results after OpenAI:", updatedImage.id);
+                
+                // Add to completed results immediately
+                setCompletedImages((prev) => {
+                  const itemResultId = `${data.details.id}_openai_complete_${sessionId}`;
+                  const alreadyExists = prev.some((img) =>
+                    img.processingId?.includes(itemResultId)
+                  );
+
+                  if (alreadyExists) {
+                    console.log("[SSE] OpenAI result already exists, skipping:", itemResultId);
+                    return prev;
+                  }
+
+                  const newCompletedId = prev.length + 1;
+                  setCompletedIdCounter(newCompletedId);
+
+                  const newCompletedImage = {
+                    ...updatedImage,
+                    completedId: newCompletedId,
+                    generatedAt: new Date(),
+                    processingId: itemResultId,
+                  };
+
+                  console.log("[SSE] Added OpenAI completed image:", newCompletedImage.completedId);
+                  return [...prev, newCompletedImage];
+                });
+
+                // Remove from active processing images
+                return prevImages.filter(img => img.id !== data.details.id);
+              });
+            }
+            break;
+
           case "item_completed":
           case "item_failed":
             console.log("[SSE] Item completed/failed:", {
@@ -278,82 +328,62 @@ export default function Home() {
               midjourneyProgress: undefined,
             });
 
-            // Update individual image status
+            // Update completed images if they already exist from OpenAI phase, or handle failures
             if (data.itemResult) {
-              setImages((prevImages) => {
-                const updatedImages = prevImages.map((img) =>
-                  img.id === data.itemResult.id
-                    ? {
-                        ...img,
-                        status: data.itemResult.success ? "completed" : "error",
-                        prompt: data.itemResult.prompt,
-                        midjourneyPrompts: data.itemResult.midjourneyPrompts,
-                        outfitNames: data.itemResult.outfitNames,
-                        error: data.itemResult.error,
-                        // Update preview with CDN link if provided by server
-                        preview: data.itemResult.cdnImageUrl || img.preview,
-                      }
-                    : img
+              // Check if image was already moved to completed results during OpenAI processing
+              setCompletedImages((prev) => {
+                const existingOpenAIResult = prev.find((img) =>
+                  img.processingId?.includes(`${data.itemResult.id}_openai_complete_${sessionId}`)
                 );
 
-                // Move completed/error image to completed list immediately
-                const completedImage = updatedImages.find(
-                  (img) =>
-                    img.id === data.itemResult.id &&
-                    (img.status === "completed" || img.status === "error")
-                );
-
-                if (completedImage) {
-                  console.log(
-                    "[SSE] Adding completed image to results:",
-                    completedImage.id
+                if (existingOpenAIResult && data.itemResult.success) {
+                  // Update the existing OpenAI result with Midjourney completion data
+                  console.log("[SSE] Updating existing OpenAI result with Midjourney data:", data.itemResult.id);
+                  return prev.map((img) =>
+                    img.processingId?.includes(`${data.itemResult.id}_openai_complete_${sessionId}`)
+                      ? {
+                          ...img,
+                          preview: data.itemResult.cdnImageUrl || img.preview, // Update with CDN link if available
+                        }
+                      : img
                   );
-                  setCompletedImages((prev) => {
-                    // Check if this specific item result was already processed in this session
-                    const itemResultId = `${data.itemResult.id}_${
-                      data.itemResult.success ? "success" : "error"
-                    }_${sessionId}`;
-                    const alreadyExists = prev.some((img) =>
-                      img.processingId?.includes(itemResultId)
-                    );
+                } else if (!data.itemResult.success) {
+                  // Handle failures - add to completed results as error
+                  const itemResultId = `${data.itemResult.id}_error_${sessionId}`;
+                  const alreadyExists = prev.some((img) =>
+                    img.processingId?.includes(itemResultId)
+                  );
 
-                    if (alreadyExists) {
-                      console.log(
-                        "[SSE] Duplicate item result detected, skipping:",
-                        itemResultId
-                      );
-                      return prev;
-                    }
-
-                    // Always add as new record - each processing should create separate entry
+                  if (!alreadyExists) {
                     const newCompletedId = prev.length + 1;
                     setCompletedIdCounter(newCompletedId);
 
-                    const newCompletedImage = {
-                      ...completedImage,
+                    const errorImage = {
+                      id: data.itemResult.id,
+                      status: "error" as const,
+                      error: data.itemResult.error,
                       completedId: newCompletedId,
                       generatedAt: new Date(),
-                      processingId: itemResultId, // Use the consistent ID to prevent duplicates
+                      processingId: itemResultId,
+                      file: { name: `Error: ${data.itemResult.id}` } as File,
+                      preview: "",
+                      clothingPart: "unknown",
+                      promptType: "unknown" as const,
+                      genderType: "unisex" as const,
                     };
 
-                    console.log(
-                      "[SSE] Created completed image with ID:",
-                      newCompletedImage.completedId,
-                      "processingId:",
-                      newCompletedImage.processingId
-                    );
-
-                    return [...prev, newCompletedImage];
-                  });
-
-                  // Remove from active images
-                  return updatedImages.filter(
-                    (img) => img.id !== data.itemResult.id
-                  );
+                    console.log("[SSE] Added error result to completed:", errorImage);
+                    return [...prev, errorImage];
+                  }
                 }
 
-                return updatedImages;
+                return prev;
               });
+
+              // Remove any remaining images from active processing
+              setImages((prevImages) => 
+                prevImages.filter(img => img.id !== data.itemResult.id)
+              );
             }
             break;
 
@@ -399,12 +429,6 @@ export default function Home() {
                 currentCounter
               );
             }, 2000);
-
-            // Smooth scroll to top when all images are processed
-            window.scrollTo({
-              top: 0,
-              behavior: "smooth",
-            });
             break;
 
           case "ping":
@@ -1014,6 +1038,25 @@ export default function Home() {
         isOpen={showResults}
         onClose={() => setShowResults(false)}
       />
+
+      {/* Floating Action Button for Completed Results */}
+      {completedImages.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <button
+            onClick={() => setShowCompletedModal(true)}
+            className="group bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-full p-4 shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-110"
+            title={`View ${completedImages.length} completed results`}
+          >
+            <div className="flex items-center space-x-3">
+              <List className="h-6 w-6" />
+              <span className="text-sm font-bold">Generated Prompts</span>
+              <span className="bg-white text-indigo-600 text-sm font-bold px-2 py-1 rounded-full min-w-[28px] text-center">
+                {completedImages.length}
+              </span>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Completed Results Modal */}
       <CompletedResultsModal

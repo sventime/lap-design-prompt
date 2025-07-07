@@ -148,7 +148,34 @@ export async function POST(request: NextRequest) {
           sessionId, // Pass sessionId for abort checking
           item.fileName, // Pass fileName for MIME type detection
           fastMode, // Pass fastMode for --fast flag
-          discordCredentials // Pass Discord credentials for token override
+          discordCredentials, // Pass Discord credentials for token override
+          // OpenAI progress callback - LAST PARAMETER
+          (stage: string, details?: any) => {
+            if (sessionId) {
+              console.log(`[BATCH] OpenAI progress callback called: ${stage}`, details);
+              sendProgressUpdate(sessionId, {
+                type: stage,
+                total: items.length,
+                completed: i,
+                processing: 1,
+                currentItem: {
+                  id: item.id,
+                  fileName: item.fileName || `Image ${i + 1}`,
+                  clothingPart: clothingPartToUse,
+                  promptType: item.promptType
+                },
+                status: `Processing image ${i + 1}/${items.length}: ${details?.stage || stage}`,
+                details: {
+                  // Merge item info with OpenAI progress details
+                  id: item.id,
+                  fileName: item.fileName || `Image ${i + 1}`,
+                  clothingPart: clothingPartToUse,
+                  promptType: item.promptType,
+                  ...details // Spread OpenAI details (gptRequest, prompt, midjourneyPrompts, etc.)
+                }
+              });
+            }
+          }
         );
 
         const itemResult = {
@@ -157,6 +184,15 @@ export async function POST(request: NextRequest) {
           ...result,
           // Include CDN URL if available
           cdnImageUrl: result.cdnImageUrl,
+          // Include debug information
+          debugInfo: {
+            guidance: item.guidance || 'No guidance provided',
+            clothingPart: clothingPartToUse,
+            promptType: item.promptType,
+            genderType: item.genderType
+          },
+          // Include the GPT request that was sent (will be added by the OpenAI function)
+          gptRequest: result.gptRequest
         };
         
         results.push(itemResult);
@@ -170,6 +206,35 @@ export async function POST(request: NextRequest) {
             processing: 0,
             itemResult,
             status: `Completed ${i + 1} of ${items.length} images`
+          });
+
+          // Send OpenAI completion update with full data
+          sendProgressUpdate(sessionId, {
+            type: 'openai_processing_complete',
+            total: items.length,
+            completed: i + 1,
+            processing: 0,
+            currentItem: {
+              id: item.id,
+              fileName: item.fileName || `Image ${i + 1}`,
+              clothingPart: clothingPartToUse,
+              promptType: item.promptType
+            },
+            status: `OpenAI processing complete for image ${i + 1}`,
+            details: {
+              id: item.id,
+              fileName: item.fileName || `Image ${i + 1}`,
+              clothingPart: clothingPartToUse,
+              promptType: item.promptType,
+              gptRequest: result.gptRequest,
+              prompt: result.prompt,
+              midjourneyPrompts: result.midjourneyPrompts,
+              outfitNames: result.outfitNames,
+              stage: "OpenAI processing complete",
+              promptsExtracted: result.midjourneyPrompts?.length || 0,
+              outfitNamesExtracted: result.outfitNames?.length || 0,
+              openaiResponse: result.openaiResponse
+            }
           });
         }
 

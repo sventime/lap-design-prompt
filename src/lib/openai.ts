@@ -61,11 +61,16 @@ export async function generateMidjourneyPrompt(
     discordToken?: string;
     discordServerId?: string;
     discordChannelId?: string;
-  }
+  },
+  onOpenAIProgress?: (
+    stage: string,
+    details?: any
+  ) => void
 ): Promise<{
   prompt: string;
   midjourneyPrompts: string[];
   outfitNames?: string[];
+  gptRequest?: string;
   midjourneyResults?: Array<{
     prompt: string;
     messageId?: string;
@@ -73,10 +78,21 @@ export async function generateMidjourneyPrompt(
   }>;
   cdnImageUrl?: string;
 }> {
+  let fullPromptText = "";
   try {
     console.log(
       `[OpenAI Request] Starting generation for ${clothingPart} (${promptType})`
     );
+
+    // Send OpenAI progress update - Starting
+    if (onOpenAIProgress) {
+      onOpenAIProgress("openai_starting", {
+        stage: "Starting OpenAI request",
+        clothingPart,
+        promptType,
+        guidance
+      });
+    }
 
     // Detect the correct MIME type from the base64 data and filename
     const mimeType = detectMimeType(imageBase64, fileName);
@@ -123,7 +139,9 @@ Requirements:
 - Show detailed view of design and fit
 - Professional fashion photography style
 - Always add "on contrasting background" to highlight the ${clothingPart}
-- Use parameters like --ar 2:3 --q 2 --s 250${guidance ? `\n- Additional guidance: ${guidance}` : ''}
+- Use parameters like --ar 2:3 --q 2 --s 250${
+        guidance ? `\n- Additional guidance: ${guidance}` : ""
+      }
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
@@ -132,7 +150,9 @@ IMPORTANT FORMATTING:
 - Format: PROMPT1: [full prompt description] --ar 2:3 --q 2 --s 250
 - Format: PROMPT2: [full prompt description] --ar 2:3 --q 2 --s 250
 - Format: PROMPT3: [full prompt description] --ar 2:3 --q 2 --s 250
-- Use plain text only, no bold or bullet points, no quotation marks
+- Use plain text only, no bold or bullet points, no quotation marks${
+        guidance ? `\n- OVERRIDE ADDITIONAL GUIDANCE, FINAL PROMPT SHOULD INCLUDE: ${guidance}` : ""
+      }
 
 Also create 10 product names:
 Format: "NAME1: English Name | Russian Translation"
@@ -148,7 +168,7 @@ Requirements:
 - Use macro photography perspective
 - Add lighting that shows texture depth
 - Force Midjourney to generate exatrly a texture, not an outfit or even zoomed-in part of it, but texture that I can apply on 3d model
-- Use --ar 1:1 --q 2${guidance ? `\n- Additional guidance: ${guidance}` : ''}
+- Use --ar 1:1 --q 2${guidance ? `\n- Additional guidance: ${guidance}` : ""}
 
 IMPORTANT FORMATTING:
 - Each prompt must be on a SINGLE LINE
@@ -157,7 +177,9 @@ IMPORTANT FORMATTING:
 - Format: PROMPT1: [fabric type] fabric texture, [material properties], macro photography --ar 1:1 --q 2
 - Format: PROMPT2: [fabric type] fabric texture, [material properties], macro photography --ar 1:1 --q 2
 - Format: PROMPT3: [fabric type] fabric texture,  [material properties], macro photography --ar 1:1 --q 2
-- Use plain text only, no bold or bullet points, no quotation marks
+- Use plain text only, no bold or bullet points, no quotation marks${
+        guidance ? `\n- OVERRIDE ADDITIONAL GUIDANCE, FINAL PROMPT SHOULD INCLUDE: ${guidance}` : ""
+      }
 
 Examples of good fabric texture prompts:
 - Cotton denim fabric texture, diagonal twill weave, indigo blue threads, raw selvedge edge, macro photography --ar 1:1 --q 2
@@ -180,21 +202,33 @@ Do not include /imagine command.`,
       ],
     };
 
+    // Extract the text content for debugging
+    fullPromptText =
+      requestPayload.messages[0].content.find((item) => item.type === "text")
+        ?.text || "";
+    console.log(`[OpenAI Debug] Full prompt being sent:`, fullPromptText);
+    console.log(
+      `[OpenAI Debug] Guidance parameter:`,
+      guidance || "No guidance provided"
+    );
+    console.log(`[OpenAI Debug] Clothing part:`, clothingPart);
+    console.log(`[OpenAI Debug] Prompt type:`, promptType);
+
     // Log request payload without image data to avoid console spam
     const logPayload = {
       ...requestPayload,
-      messages: requestPayload.messages.map(msg => ({
+      messages: requestPayload.messages.map((msg) => ({
         ...msg,
-        content: Array.isArray(msg.content) 
-          ? msg.content.map(item => 
-              item.type === 'image_url' 
-                ? { ...item, image_url: { url: '[IMAGE_DATA_OMITTED]' } }
+        content: Array.isArray(msg.content)
+          ? msg.content.map((item) =>
+              item.type === "image_url"
+                ? { ...item, image_url: { url: "[IMAGE_DATA_OMITTED]" } }
                 : item
             )
-          : msg.content
-      }))
+          : msg.content,
+      })),
     };
-    
+
     console.log(
       `[OpenAI Request] Request payload:`,
       JSON.stringify(logPayload, null, 2)
@@ -204,6 +238,15 @@ Do not include /imagine command.`,
     console.log(
       `[OpenAI] Making API call to OpenAI with model: ${requestPayload.model}...`
     );
+
+    // Send OpenAI progress update - Sending request
+    if (onOpenAIProgress) {
+      onOpenAIProgress("openai_requesting", {
+        stage: "Sending request to OpenAI",
+        model: requestPayload.model,
+        gptRequest: fullPromptText
+      });
+    }
 
     let response;
     try {
@@ -235,6 +278,24 @@ Do not include /imagine command.`,
     const endTime = Date.now();
 
     console.log(`[OpenAI Response] Completed in ${endTime - startTime}ms`);
+
+    // Send OpenAI progress update - Received response
+    if (onOpenAIProgress) {
+      onOpenAIProgress("openai_response_received", {
+        stage: "Received response from OpenAI",
+        duration: endTime - startTime,
+        model: response.model,
+        responseId: response.id,
+        openaiResponse: {
+          id: response.id,
+          model: response.model,
+          created: response.created,
+          usage: response.usage,
+          finishReason: response.choices[0]?.finish_reason,
+          contentLength: response.choices[0]?.message?.content?.length || 0
+        }
+      });
+    }
     console.log(`[OpenAI Response] Full response structure:`, {
       id: response.id,
       object: response.object,
@@ -257,6 +318,7 @@ Do not include /imagine command.`,
     }
 
     console.log(`[OpenAI Response] Content length:`, content.length);
+    console.log(`[OpenAI Response] Full content:`, content);
     console.log(
       `[OpenAI Response] Content preview:`,
       content.substring(0, 500)
@@ -269,16 +331,32 @@ Do not include /imagine command.`,
       "I'm unable to",
       "I can't provide analysis",
       "can't analyze",
-      "unable to analyze"
+      "unable to analyze",
+      "I'm unable to see images",
+      "I can't see the image",
+      "unable to see images",
     ];
-    
-    const isRefusal = refusalKeywords.some(keyword => 
+
+    const isRefusal = refusalKeywords.some((keyword) =>
       content.toLowerCase().includes(keyword.toLowerCase())
     );
-    
+
     if (isRefusal) {
       console.warn(`[OpenAI] Content policy refusal detected:`, content);
-      throw new Error(`OpenAI refused to analyze the image: ${content.substring(0, 200)}...`);
+      
+      // Send OpenAI error progress update
+      if (onOpenAIProgress) {
+        onOpenAIProgress("openai_refusal", {
+          stage: "OpenAI refused to analyze image",
+          error: content.substring(0, 500),
+          gptRequest: fullPromptText,
+          refusalReason: "Image analysis refused by OpenAI"
+        });
+      }
+      
+      throw new Error(
+        `OpenAI refused to analyze the image: ${content.substring(0, 200)}...`
+      );
     }
 
     // Extract individual prompts from the response with bulletproof parsing
@@ -323,24 +401,65 @@ Do not include /imagine command.`,
 
     // Validate that we extracted valid prompts
     if (prompts.length === 0) {
-      console.warn(`[OpenAI] No valid prompts found in response. Content:`, content);
-      throw new Error(`No valid prompts could be extracted from OpenAI response. Response: ${content.substring(0, 300)}...`);
+      console.warn(
+        `[OpenAI] No valid prompts found in response. Content:`,
+        content
+      );
+      throw new Error(
+        `No valid prompts could be extracted from OpenAI response. Response: ${content.substring(
+          0,
+          300
+        )}...`
+      );
     }
 
-    console.log(`[OpenAI] Successfully extracted ${prompts.length} prompts from response`);
+    console.log(
+      `[OpenAI] Successfully extracted ${prompts.length} prompts from response`
+    );
+
+    // Send OpenAI progress update - Processing complete
+    if (onOpenAIProgress) {
+      onOpenAIProgress("openai_processing_complete", {
+        stage: "Processing OpenAI response complete",
+        promptsExtracted: prompts.length,
+        outfitNamesExtracted: promptType === "outfit" ? outfitNames.length : 0,
+        prompt: content,
+        midjourneyPrompts: prompts.slice(0, 3),
+        gptRequest: fullPromptText, // Include the original request
+        openaiResponse: {
+          id: response.id,
+          model: response.model,
+          created: response.created,
+          usage: response.usage,
+          finishReason: response.choices[0]?.finish_reason
+        }
+      });
+    }
 
     // Prepare prompts for UI display - add --fast if fastMode is enabled
-    const displayPrompts = fastMode 
-      ? prompts.slice(0, 3).map(prompt => `${prompt} --fast`)
+    const displayPrompts = fastMode
+      ? prompts.slice(0, 3).map((prompt) => `${prompt} --fast`)
       : prompts.slice(0, 3);
 
     const result = {
       prompt: content,
       midjourneyPrompts: displayPrompts,
       outfitNames: promptType === "outfit" ? outfitNames : undefined,
+      gptRequest: fullPromptText, // Add the full prompt text that was sent to GPT
+      openaiResponse: {
+        id: response.id,
+        model: response.model,
+        created: response.created,
+        usage: response.usage,
+        finishReason: response.choices[0]?.finish_reason
+      }
     };
 
-    console.log(`[OpenAI] Fast mode ${fastMode ? 'enabled' : 'disabled'} - generated ${displayPrompts.length} prompts for UI display`);
+    console.log(
+      `[OpenAI] Fast mode ${fastMode ? "enabled" : "disabled"} - generated ${
+        displayPrompts.length
+      } prompts for UI display`
+    );
 
     // Auto-send to Midjourney if requested
     if (autoSendToMidjourney && result.midjourneyPrompts.length > 0) {
@@ -353,13 +472,19 @@ Do not include /imagine command.`,
         const { sendMultiplePromptsToMidjourney } = await import(
           "./midjourney"
         );
-        
+
         // Use the display prompts (which already have --fast if fastMode is enabled)
-        console.log(`[OpenAI] Fast mode ${fastMode ? 'enabled' : 'disabled'} - sending ${result.midjourneyPrompts.length} prompts to Midjourney`);
+        console.log(
+          `[OpenAI] Fast mode ${fastMode ? "enabled" : "disabled"} - sending ${
+            result.midjourneyPrompts.length
+          } prompts to Midjourney`
+        );
         if (fastMode) {
-          console.log(`[OpenAI] Prompts include --fast flag for faster generation`);
+          console.log(
+            `[OpenAI] Prompts include --fast flag for faster generation`
+          );
         }
-        
+
         const midjourneyResult = await sendMultiplePromptsToMidjourney(
           result.midjourneyPrompts,
           discordCredentials,
@@ -401,6 +526,17 @@ Do not include /imagine command.`,
     return result;
   } catch (error) {
     console.error("Error generating Midjourney prompt:", error);
+    
+    // Send OpenAI error progress update
+    if (onOpenAIProgress) {
+      onOpenAIProgress("openai_error", {
+        stage: "OpenAI request failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+        gptRequest: fullPromptText || "Request not available",
+        errorType: "openai_failure"
+      });
+    }
+    
     // Preserve the original error message instead of making it generic
     if (error instanceof Error) {
       throw error;
